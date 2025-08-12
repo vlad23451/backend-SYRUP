@@ -1,0 +1,12 @@
+uvicorn[standard]
+fastapi
+sqlalchemy>=2.0
+aiosqlite
+pydantic
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt
+colorlog
+python-multipart
+redis
