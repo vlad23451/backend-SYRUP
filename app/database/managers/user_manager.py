@@ -80,3 +80,92 @@ class UserManager(BaseManager[User, UpdateUser]):
     def _hash_password(password: str) -> str:
         return bcrypt.hashpw(password.encode("utf-8"),
                              bcrypt.gensalt()).decode("utf-8")
+    
+    @staticmethod
+    async def get_users_by_role(role_id: int) -> list[User]:
+        """Получить всех пользователей с определенной ролью."""
+        try:
+            async with manager.get_async_session() as session:
+                result = await session.execute(
+                    select(User).where(User.role == role_id).order_by(User.login)
+                )
+                return list(result.scalars().all())
+        except Exception as e:
+            app_logger.exception(f"Ошибка при получении пользователей с ролью {role_id}: {e}")
+            raise DatabaseError(f"Ошибка при получении пользователей с ролью {role_id}")
+    
+    @staticmethod
+    async def get_role_statistics() -> dict[int, int]:
+        """Получить статистику распределения ролей."""
+        try:
+            async with manager.get_async_session() as session:
+                from sqlalchemy import func
+                result = await session.execute(
+                    select(User.role, func.count(User.id))
+                    .group_by(User.role)
+                    .order_by(User.role)
+                )
+                return {role_id: count for role_id, count in result.all()}
+        except Exception as e:
+            app_logger.exception(f"Ошибка при получении статистики ролей: {e}")
+            raise DatabaseError("Ошибка при получении статистики ролей")
+    
+    @staticmethod
+    async def update_user_role(user_id: int, new_role: int) -> User:
+        """Обновить роль пользователя."""
+        try:
+            async with manager.get_async_session() as session:
+                result = await session.execute(select(User).where(User.id == user_id))
+                user = result.scalars().first()
+                if not user:
+                    raise UserNotFoundError()
+                
+                user.role = new_role
+                await session.commit()
+                await session.refresh(user)
+                
+                app_logger.info(f"Роль пользователя {user.login} (ID: {user_id}) изменена на {new_role}")
+                return user
+        except UserNotFoundError:
+            raise
+        except Exception as e:
+            app_logger.exception(f"Ошибка при обновлении роли пользователя {user_id}: {e}")
+            raise DatabaseError(f"Ошибка при обновлении роли пользователя")
+    
+    @staticmethod
+    async def update_user_avatar(user_id: int, avatar_key: str) -> User:
+        """Обновить аватар пользователя.
+        
+        Args:
+            user_id: ID пользователя
+            avatar_key: object_key аватара в S3 (например: "avatars/uuid.jpg")
+            
+        Returns:
+            User: Обновленный пользователь
+            
+        Raises:
+            UserNotFoundError: Пользователь не найден
+            DatabaseError: Ошибка базы данных
+            
+        Example:
+            >>> user = await UserManager.update_user_avatar(123, "avatars/new-avatar.jpg")
+            >>> print(user.avatar_key)  # "avatars/new-avatar.jpg"
+        """
+        try:
+            async with manager.get_async_session() as session:
+                result = await session.execute(select(User).where(User.id == user_id))
+                user = result.scalars().first()
+                if not user:
+                    raise UserNotFoundError()
+                
+                user.avatar_key = avatar_key
+                await session.commit()
+                await session.refresh(user)
+                
+                app_logger.info(f"Аватар пользователя {user.login} (ID: {user_id}) обновлен: {avatar_key}")
+                return user
+        except UserNotFoundError:
+            raise
+        except Exception as e:
+            app_logger.exception(f"Ошибка при обновлении аватара пользователя {user_id}: {e}")
+            raise DatabaseError(f"Ошибка при обновлении аватара пользователя")

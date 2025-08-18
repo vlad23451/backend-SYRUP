@@ -22,7 +22,7 @@ class User(Base):
     login: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(nullable=False)
     role: Mapped[int] = mapped_column(default=1, nullable=False, index=True)
-    avatar_url: Mapped[str | None] = mapped_column(nullable=True)
+    avatar_key: Mapped[str | None] = mapped_column(nullable=True)
     about: Mapped[str | None] = mapped_column(nullable=True)
 
     histories: Mapped[list["History"]] = relationship(

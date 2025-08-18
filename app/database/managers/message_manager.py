@@ -3,14 +3,14 @@
 Содержит выборки сообщений по комнате, последние сообщения по комнатам,
 служебные предикаты и форматирование данных в схемы ответа.
 """
-from typing import List
+from typing import List, Optional
 
 from database.managers.base_manager import BaseManager
 from database.managers.session_manager import manager
 from database.models.message import Message
 from schemas.message import MessageOut
 from schemas.message import MessageUpdate
-from sqlalchemy import and_
+from sqlalchemy import and_, update
 from sqlalchemy import func
 from sqlalchemy import or_
 from sqlalchemy import select
@@ -78,7 +78,21 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
                           from_me=True,
                           message_type=getattr(message, 'message_type', 'text'),
                           is_read=getattr(message, 'is_read', False),
-                          metadata=getattr(message, 'metadata', {}))
+                          metadata=getattr(message, 'message_metadata', {}))
+
+    @staticmethod
+    async def _format_message_out_with_me(message: Message, me_user_id: int) -> MessageOut:
+        """Форматирование сообщения с учётом текущего пользователя (from_me)."""
+        return MessageOut(id=message.id,
+                          sender_id=message.sender_id,
+                          receiver_id=message.receiver_id,
+                          room_id=message.room_id,
+                          text=message.text,
+                          timestamp=message.timestamp,
+                          from_me=(message.sender_id == me_user_id),
+                          message_type=getattr(message, 'message_type', 'text'),
+                          is_read=getattr(message, 'is_read', False),
+                          metadata=getattr(message, 'message_metadata', {}))
 
     @staticmethod
     async def _format_chat_preview(message: Message, current_user_id: int) -> dict:
@@ -112,6 +126,34 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
             return [await MessageManager._format_message_out(msg) for msg in messages]
 
     @staticmethod
+    async def get_history_by_room(room_id: str, me_user_id: int, skip: int = 0, limit: int = 50) -> List[MessageOut]:
+        """История сообщений по room_id с пагинацией (по времени по убыванию)."""
+        async with manager.get_async_session() as session:
+            result = await session.execute(
+                select(Message)
+                .where(Message.room_id == room_id)
+                .order_by(Message.timestamp.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            messages = result.scalars().all()
+            return [await MessageManager._format_message_out_with_me(msg, me_user_id) for msg in messages]
+
+    @staticmethod
+    async def get_history_with_user(user1_id: int, user2_id: int, me_user_id: int, skip: int = 0, limit: int = 50) -> List[MessageOut]:
+        """История сообщений между двумя пользователями с пагинацией."""
+        async with manager.get_async_session() as session:
+            result = await session.execute(
+                select(Message)
+                .where(MessageManager._get_chat_filter(user1_id, user2_id))
+                .order_by(Message.timestamp.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            messages = result.scalars().all()
+            return [await MessageManager._format_message_out_with_me(msg, me_user_id) for msg in messages]
+
+    @staticmethod
     async def get_user_chats(user_id: int) -> List[dict]:
         """Получить последние сообщения по комнатам для пользователя."""
         async with manager.get_async_session() as session:
@@ -130,5 +172,36 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
     async def get_last_message_by_room_id(room_id: str) -> Message | None:
         """Получить последнее сообщение по ID комнаты."""
         async with manager.get_async_session() as session:
-            result = await session.execute(MessageManager._select_last_message_by_room(room_id))
-            return result.scalars().first() 
+            result_message_out = await session.execute(MessageManager._select_last_message_by_room(room_id))
+            return result_message_out.scalars().first() 
+
+    @staticmethod
+    async def mark_read(room_id: str, receiver_id: int, until_timestamp: Optional[str] = None) -> int:
+        """Пометить сообщения как прочитанные в комнате для получателя.
+
+        until_timestamp — ISO строка. Если не задана, помечаем все сообщения в комнате для этого получателя.
+        Возвращает количество обновлённых строк.
+        """
+        async with manager.get_async_session() as session:
+            stmt = update(Message).where(
+                and_(
+                    Message.room_id == room_id,
+                    Message.receiver_id == receiver_id,
+                    Message.is_read == False,  # noqa: E712
+                )
+            ).values(is_read=True)
+
+            if until_timestamp:
+                try:
+                    # сравнение по строке времени — полагаемся на формат ISO и хранение в UTC
+                    # SQLAlchemy сам подставит корректный тип
+                    from datetime import datetime
+                    ts = datetime.fromisoformat(until_timestamp)
+                    stmt = stmt.where(Message.timestamp <= ts)
+                except Exception:
+                    # если парсинг не удался — отметим без ограничения по времени
+                    pass
+
+            result = await session.execute(stmt)
+            await session.commit()
+            return int(result.rowcount or 0)

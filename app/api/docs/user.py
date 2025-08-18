@@ -9,7 +9,7 @@ user_get_responses = {
                     "id": 1,
                     "login": "user",
                     "about": "О себе",
-                    "avatar_url": "https://example.com/avatar.png",
+                    "avatar_key": "avatars/example-avatar.jpg",
                     "role": 0
                 }
             }
@@ -42,7 +42,7 @@ user_update_responses = {
                     "id": 1,
                     "login": "user",
                     "about": "Обновлённое описание",
-                    "avatar_url": "https://example.com/avatar2.png",
+                    "avatar_key": "avatars/example-avatar2.jpg",
                     "role": 0
                 }
             }

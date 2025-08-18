@@ -56,8 +56,9 @@ get_chats_responses_raw = {
             "application/json": {
                 "example": [
                     {
+                        "companion_id": 42,
                         "companion_login": "user2",
-                        "companion_avatar_url": "https://example.com/avatar.png",
+                        "companion_avatar_url": "avatars/example-companion.jpg",
                         "last_message": "Привет!",
                         "last_message_time": "2024-05-01T12:00:00",
                         "from_me": True

@@ -14,6 +14,7 @@ from database.models.comments import Comment
 from database.models.history import History
 from database.models.history_like import HistoryDislike
 from database.models.history_like import HistoryLike
+from database.models.history_score import HistoryScore
 from database.models.user import User
 
 from exceptions.base import DatabaseError
@@ -32,6 +33,7 @@ from services.cache_service import (
 from services.cache_service import HistoryCacheService
 from services.user_builders_service import build_user_list
 from services.user_builders_service import build_users_map
+from services.score_service import ScoreService
 
 from sqlalchemy import desc
 from sqlalchemy import func
@@ -127,7 +129,13 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
     async def _fetch_histories_with_author(self, skip: int, limit: int = 10) -> List[History]:
         async with self.manager.get_async_session() as session:
             result = await session.execute(
-                HistoryManager._select_with_author().order_by(desc(History.created_at)).offset(skip).limit(limit)
+                HistoryManager._select_with_author()
+                .join(HistoryScore, HistoryScore.history_id == History.id, isouter=True)
+                .order_by(
+                    desc(func.coalesce(HistoryScore.score, 0.0)),
+                    desc(History.created_at))
+                .offset(skip)
+                .limit(limit)
             )
             return list(result.scalars().all())
 
@@ -138,7 +146,30 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
         async with self.manager.get_async_session() as session:
             result = await session.execute(
                 HistoryManager._select_with_author_by_author_id(author_id)
-                .order_by(desc(History.created_at))
+                .join(HistoryScore, HistoryScore.history_id == History.id, isouter=True)
+                .order_by(
+                    desc(func.coalesce(HistoryScore.score, 0.0)),
+                    desc(History.created_at))
+                .offset(skip)
+                .limit(limit)
+            )
+            return list(result.scalars().all())
+
+    async def _fetch_histories_by_authors_with_author(self,
+                                                      author_ids: List[int],
+                                                      skip: int,
+                                                      limit: int) -> List[History]:
+        if not author_ids:
+            return []
+        async with self.manager.get_async_session() as session:
+            result = await session.execute(
+                select(History)
+                .options(joinedload(History.author))
+                .where(History.author_id.in_(author_ids))
+                .join(HistoryScore, HistoryScore.history_id == History.id, isouter=True)
+                .order_by(
+                    desc(func.coalesce(HistoryScore.score, 0.0)),
+                    desc(History.created_at))
                 .offset(skip)
                 .limit(limit)
             )
@@ -330,9 +361,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             if cached is not None:
                 return cached
 
-            histories: List[History] = []
-            for fid in friends_ids:
-                histories.extend(await self._fetch_histories_by_author_with_author(fid, skip, limit))
+            histories: List[History] = await self._fetch_histories_by_authors_with_author(friends_ids, skip, limit)
             if not histories:
                 await FriendsHistoriesCacheService.set_histories(
                     user_id=user_id, skip=skip, limit=limit, me_user_id=me_user_id or 0, data=[]
@@ -361,9 +390,9 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             if cached is not None:
                 return cached
 
-            histories: List[History] = []
-            for uid in following_user_ids:
-                histories.extend(await self._fetch_histories_by_author_with_author(uid, skip, limit))
+            histories: List[History] = await self._fetch_histories_by_authors_with_author(
+                following_user_ids, skip, limit
+            )
 
             if not histories:
                 await FollowingHistoriesCacheService.set_histories(
@@ -415,9 +444,26 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 await session.commit()
                 result = await session.execute(HistoryManager._select_with_author_by_id(history_obj.id))
                 history_with_author = result.scalars().first()
-                out = HistoryOut.model_validate(history_with_author)
+                
+                # Для новой истории counts всегда равны 0, но получаем реальные значения для консистентности
+                likes_map = await self._fetch_count_map(HistoryLike, [history_obj.id])
+                dislikes_map = await self._fetch_count_map(HistoryDislike, [history_obj.id])
+                comments_map = await self._fetch_comments_map([history_obj.id])
+                
+                # Используем from_model_with_counts вместо model_validate для консистентности
+                out = HistoryOut.from_model_with_counts(
+                    history_obj=history_with_author,
+                    likes=likes_map.get(history_obj.id, 0),
+                    dislikes=dislikes_map.get(history_obj.id, 0),
+                    comments=comments_map.get(history_obj.id, 0),
+                    liked_users=[],  # Новая история не может иметь лайков
+                    disliked_users=[]  # Новая история не может иметь дизлайков
+                )
+                
                 await HistoryCacheService.invalidate_history_cache(history_obj.id)
                 await HistoriesByAuthorCacheService.invalidate_histories(out.author.id if hasattr(out, 'author') and out.author else history_obj.author_id)
+                # Initial score compute for the newly created history
+                await ScoreService.recompute_for_history_id(history_obj.id)
                 return out
         except Exception as e:
             app_logger.exception(f"Ошибка при создании истории: {e}")

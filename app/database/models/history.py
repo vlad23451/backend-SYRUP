@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .user import User
     from .history_like import HistoryLike, HistoryDislike
     from .comments import Comment
+    from .history_score import HistoryScore
 
 class History(Base):
     __tablename__ = 'histories'
@@ -57,4 +58,8 @@ class History(Base):
     comments_rel: Mapped[list["Comment"]] = relationship(
         back_populates='history',
         cascade='all, delete'
+    )
+
+    score_rel: Mapped["HistoryScore"] = relationship(
+        'HistoryScore', back_populates='history', uselist=False, cascade='all, delete-orphan'
     )

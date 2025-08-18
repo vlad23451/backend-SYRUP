@@ -25,14 +25,41 @@ class Settings(BaseSettings):
     jwt_access_cookie_name: str = "access_token"
     jwt_refresh_cookie_name: str = "refresh_token"
 
-    cors_origins: List[str] = ["http://localhost:3000",
-                              "http://127.0.0.1:3000"]
+    # CORS settings - can be overridden via environment variables
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000", 
+        "https://myprojectfrontend.loca.lt"
+    ]
+    
+    # Use regex for flexible origin matching (supports mobile devices and tunnels)
+    cors_allow_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}|.*\.loca\.lt|.*\.ngrok\.io|.*\.trycloudflare\.com)(:\d+)?(/.*)?$"
 
     host: str = "0.0.0.0"
     port: int = 8000
     
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+
+    # Score recompute interval (seconds)
+    score_refresh_seconds: int = 300
+    
+    # S3 Storage settings
+    s3_access_key_id: str = "f55abbf2689e48a7a5c0682250228bf5"
+    s3_secret_access_key: str = "c9a013b509114a2ebcc429ee9cefce71"
+    s3_bucket_name: str = "test-backet-syrup"
+    s3_region: str = "ru-7"
+    s3_endpoint_url: str  = "https://s3.ru-7.storage.selcloud.ru" 
+    s3_use_ssl: bool = True
+    
+    # File upload settings
+    max_file_size: int = 10 * 1024 * 1024  # 10MB
+    allowed_file_types: list[str] = [
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "video/mp4", "video/webm", "video/ogg",
+        "audio/mpeg", "audio/wav", "audio/ogg",
+        "application/pdf", "text/plain"
+    ]
     
     model_config = {
         "env_file": ".env",

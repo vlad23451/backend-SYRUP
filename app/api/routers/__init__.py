@@ -9,5 +9,6 @@ from .friends import friends_router as friends
 from .history import history_router as history
 from .like import like_router as like
 from .message import message_router as message
+from .role import role_router as role
 from .user import user_router as user
 from .websocket import websocket_router as websocket

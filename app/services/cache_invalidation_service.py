@@ -18,6 +18,7 @@ from services.cache_service import (
     FollowingHistoriesCacheService,
     UsersSearchCacheService,
     UserCacheService,
+    HistoryScoreCacheService,
 )
 
 
@@ -32,6 +33,7 @@ class CacheInvalidationService:
         """
         if history_id is not None:
             await HistoryCacheService.invalidate_history_cache(history_id)
+            await HistoryScoreCacheService.invalidate_score(history_id)
         if comment_author_ids:
             for uid in comment_author_ids:
                 await UserCacheService.invalidate_user_cache(uid)
@@ -42,6 +44,7 @@ class CacheInvalidationService:
     async def on_history_changed(history_id: int, author_id: int):
         """Инвалидация при создании/обновлении/удалении истории."""
         await HistoryCacheService.invalidate_history_cache(history_id)
+        await HistoryScoreCacheService.invalidate_score(history_id)
         await UserCacheService.invalidate_user_cache(author_id)
         await HistoriesByAuthorCacheService.invalidate_histories(author_id)
 

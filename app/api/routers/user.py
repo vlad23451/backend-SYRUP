@@ -1,38 +1,61 @@
-"""Роуты пользователей.
-
-Архитектурные заметки:
-- Тонкий слой роутера: валидация входов и делегирование бизнес-логики
-  менеджерам и сервисам (`UserManager`, `HistoryManager`, `FollowersManager`,
-  `FriendsManager`, `user_info_service`).
-- Используем кэш там, где это оправдано: профили, истории, поиск.
-- Параллелим независимые операции через `asyncio.gather` (профиль / метрики).
-"""
 import asyncio
 from typing import List
 
 from api.dependencies.auth import get_current_user
 from api.dependencies.pagination import get_large_pagination
-from api.docs.user import (delete_user_description,
-                           get_histories_by_id_description,
-                           get_histories_description, get_me_description,
-                           get_user_by_id_description, patch_me_description,
-                           user_delete_responses, user_get_responses,
-                           user_histories_responses, user_update_responses)
+
+from api.docs.avatar import avatar_get_responses
+from api.docs.avatar import avatar_upload_responses
+from api.docs.avatar import get_my_avatar_description
+from api.docs.avatar import get_user_avatar_description
+from api.docs.avatar import upload_my_avatar_description
+
+from api.docs.user import delete_user_description
+from api.docs.user import get_histories_by_id_description
+from api.docs.user import get_histories_description
+from api.docs.user import get_me_description
+from api.docs.user import get_user_by_id_description
+from api.docs.user import patch_me_description
+from api.docs.user import user_delete_responses
+from api.docs.user import user_get_responses
+from api.docs.user import user_histories_responses
+from api.docs.user import user_update_responses
+
 from core.cookie import clear_auth_cookies
 from core.logger import app_logger
+
 from database.managers.followers_manager import FollowersManager
 from database.managers.friends_manager import FriendsManager
 from database.managers.history_manager import HistoryManager
+
 from database.managers.user_manager import UserManager
+
 from database.models.user import User
-from fastapi import APIRouter, Depends, Query, Response, status
+
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import File
+from fastapi import Response
+from fastapi import UploadFile
+from fastapi import status 
+
+from schemas.avatar import AvatarResponse
+from schemas.avatar import UploadAvatarResponse
+
 from schemas.history import HistoryOutShort
-from schemas.user import (ProfileOutFull, UpdateMe, UpdateUser, UserOut,
-                          UserShortOutWithFollowStatus)
+
+from schemas.user import ProfileOutFull
+from schemas.user import UpdateMe
+from schemas.user import UpdateUser
+from schemas.user import UserOut
+from schemas.user import UserShortOutWithFollowStatus
+
 from services.cache_service import UsersSearchCacheService
 from services.cache_invalidation_service import CacheInvalidationService
+from services.avatar_service import avatar_service
 from services.error_handler_service import handle_api_errors
-from services.user_info_service import build_user_info, build_user_info_many
+from services.user_info_service import build_user_info
+from services.user_info_service import build_user_info_many
 
 user_manager = UserManager()
 history_manager = HistoryManager()
@@ -96,6 +119,27 @@ async def get_histories(user: User = Depends(get_current_user),
     app_logger.info_event("user_histories_fetched", user_id=user.id, skip=skip, limit=limit)
     return res
 
+@user_router.get('/me/avatar',
+                 summary='Получить свой аватар',
+                 status_code=status.HTTP_200_OK,
+                 responses=avatar_get_responses,
+                 description=get_my_avatar_description)
+@handle_api_errors("Ошибка при получении своего аватара")
+async def get_my_avatar(current_user: User = Depends(get_current_user)) -> AvatarResponse:
+    url = await avatar_service.get_my_avatar_url(current_user)
+    return AvatarResponse(url=url)
+
+@user_router.post('/me/avatar',
+                  summary='Загрузить свой аватар',
+                  status_code=status.HTTP_200_OK,
+                  responses=avatar_upload_responses,
+                  description=upload_my_avatar_description)
+@handle_api_errors("Ошибка при загрузке аватара")
+async def upload_my_avatar(file: UploadFile = File(..., description="Файл аватара"),
+                          current_user: User = Depends(get_current_user)) -> UploadAvatarResponse:
+    avatar_key, url = await avatar_service.upload_my_avatar(file, current_user)
+    return UploadAvatarResponse(avatar_key=avatar_key, url=url)
+
 @user_router.delete('/me',
                     summary='Удалить свой аккаунт',
                     status_code=status.HTTP_204_NO_CONTENT,
@@ -141,6 +185,17 @@ async def get_histories_by_id(id: int,
     result = await history_manager.get_histories_by_author_id(author_id=id, me_user_id=id, skip=skip, limit=limit)
     app_logger.info_event("user_histories_by_id_fetched", target_user_id=id, skip=skip, limit=limit)
     return result
+
+@user_router.get('/profile/{user_id}/avatar',
+                 summary='Получить аватар пользователя',
+                 status_code=status.HTTP_200_OK,
+                 responses=avatar_get_responses,
+                 description=get_user_avatar_description)
+@handle_api_errors("Ошибка при получении аватара")
+async def get_user_avatar(user_id: int, 
+                         current_user: User = Depends(get_current_user)) -> AvatarResponse:
+    url = await avatar_service.get_user_avatar_url(user_id)
+    return AvatarResponse(url=url)
 
 @user_router.get('/search',
                  summary='Поиск пользователей по логину',

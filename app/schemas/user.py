@@ -1,7 +1,7 @@
 from enum import Enum
 
 from pydantic import BaseModel, field_validator
-
+from schemas.role import UserRole
 
 class FollowStatus(Enum):
     NOT_FOLLOWING = "not_following"
@@ -13,7 +13,7 @@ class FollowStatus(Enum):
 class UserBase(BaseModel):
     login: str
     about: str | None = None
-    avatar_url: str | None = None
+    avatar_key: str | None = None
 
 class UserCreate(UserBase):
     password: str
@@ -21,9 +21,15 @@ class UserCreate(UserBase):
 class UserOut(UserBase):
     id: int
     role: int
+    role_name: str | None = None
     friends: list[int] | None = None
     followers: list[int] | None = None
     following: list[int] | None = None
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if hasattr(self, 'role') and not self.role_name:
+            self.role_name = UserRole.get_role_name(self.role)
 
     class Config:
         from_attributes = True
@@ -32,7 +38,7 @@ class UserShortOut(BaseModel):
     id: int
     login: str
     about: str | None = None
-    avatar_url: str | None = None
+    avatar_key: str | None = None
     
     @field_validator("about", mode="before")
     def validate_about(v):
@@ -54,11 +60,11 @@ class UpdateUser(BaseModel):
     login: str | None = None
     password: str | None = None
     about: str | None = None
-    avatar_url: str | None = None
+    avatar_key: str | None = None
 
 class UpdateMe(BaseModel):
     about: str | None = None
-    avatar_url: str | None = None
+    avatar_key: str | None = None
 
 class ProfileOutFull(BaseModel):
     user_info: UserShortOutWithFollowStatus

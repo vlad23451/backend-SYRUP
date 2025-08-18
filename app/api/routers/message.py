@@ -11,6 +11,8 @@ from exceptions.users import UserNotFoundError
 from fastapi import APIRouter, Depends, status
 from schemas.chat import ChatOut
 from services.error_handler_service import handle_api_errors
+from fastapi import Query
+from schemas.message import MessageOut
 
 message_router = APIRouter(prefix="/messages", tags=["Сообщения"])
 
@@ -44,8 +46,9 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[ChatOut]:
     for i, comp in enumerate(companions):
         last_msg = last_messages[i]
         chats_out.append(ChatOut(
+            companion_id=int(getattr(comp, 'id', 0)),
             companion_login=str(comp.login),
-            companion_avatar_url=str(comp.avatar_url) if comp.avatar_url is not None else None,
+            companion_avatar_url=str(comp.avatar_key) if comp.avatar_key is not None else None,
             last_message=str(getattr(last_msg, 'text', None)),
             last_message_time=getattr(last_msg, 'timestamp', datetime.datetime.now()),
             from_me=bool(getattr(last_msg, 'sender_id', 0) == user_id),
@@ -54,3 +57,24 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[ChatOut]:
         ))
     app_logger.info_event("chats_fetched", user_id=user.id, chats=len(chats_out))
     return chats_out
+
+
+@message_router.get('/history/room/{room_id}', summary='История сообщений комнаты')
+@handle_api_errors("Ошибка при получении истории комнаты")
+async def get_room_history(room_id: str,
+                           skip: int = Query(0, ge=0),
+                           limit: int = Query(50, ge=1, le=200),
+                           user: User = Depends(get_current_user)) -> List[MessageOut]:
+    app_logger.info(f"История для комнаты {room_id}, user_id={user.id}, skip={skip}, limit={limit}")
+    return await message_manager.get_history_by_room(room_id, me_user_id=user.id, skip=skip, limit=limit)
+
+
+@message_router.get('/history/with/{companion_id}', summary='История сообщений с пользователем')
+@handle_api_errors("Ошибка при получении истории с пользователем")
+async def get_history_with_user(companion_id: int,
+                                skip: int = Query(0, ge=0),
+                                limit: int = Query(50, ge=1, le=200),
+                                user: User = Depends(get_current_user)) -> List[MessageOut]:
+    app_logger.info(f"История с пользователем {companion_id}, user_id={user.id}, skip={skip}, limit={limit}")
+    # Нормализованный room_id здесь не обязателен — выбираем по паре участников
+    return await message_manager.get_history_with_user(user1_id=user.id, user2_id=companion_id, me_user_id=user.id, skip=skip, limit=limit)

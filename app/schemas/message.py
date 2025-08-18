@@ -4,7 +4,6 @@ from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 
-
 class MessageType(str, Enum):
     TEXT = "text"
     IMAGE = "image"
@@ -31,7 +30,6 @@ class MessageCreate(BaseModel):
     receiver_id: int
     message_type: MessageType = MessageType.TEXT
     metadata: Dict[str, Any] | None = None
-
 
 class MessageUpdate(BaseModel):
     text: str | None = None

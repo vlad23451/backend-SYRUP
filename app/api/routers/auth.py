@@ -8,7 +8,7 @@
   refresh-токена.
 - Все неожиданные ошибки оборачиваются `handle_api_errors` в единый ответ.
 """
-from api.auth_config import JWT_ACCESS_COOKIE_NAME
+from api.auth_config import JWT_ACCESS_COOKIE_NAME, JWT_REFRESH_COOKIE_NAME
 
 from api.dependencies.auth import get_current_user
 from api.dependencies.auth import validate_refresh_token
@@ -21,11 +21,14 @@ from api.docs.auth import logout_description
 from api.docs.auth import logout_responses
 from api.docs.auth import refresh_access_token_description
 from api.docs.auth import refresh_token_responses
+from api.docs.auth import get_token_responses
+from api.docs.auth import get_token_description
 
 from core.cookie import clear_auth_cookies
 from core.cookie import set_auth_cookies
-from core.jwt import create_access_token
+from core.jwt import create_access_token, create_refresh_token
 from core.logger import app_logger
+from core.config import settings
 
 from database.models.user import User
 
@@ -37,6 +40,7 @@ from fastapi.responses import JSONResponse
 
 from schemas.user import UserAuth
 from schemas.user import UserCreate
+from schemas.token import TokenResponse
 
 from database.managers.user_manager import UserManager
 from services.auth_service import login_user
@@ -44,6 +48,16 @@ from services.auth_service import register_user
 from services.error_handler_service import handle_api_errors
 
 auth_router = APIRouter(prefix='/auth', tags=['Аутентификация'])
+
+# Explicit OPTIONS handlers для CORS preflight (если CORS middleware не работает)
+@auth_router.options('/login')
+@auth_router.options('/register') 
+@auth_router.options('/refresh')
+@auth_router.options('/logout')
+@auth_router.options('/token')
+async def options_handler():
+    """Обработка CORS preflight запросов"""
+    return {"status": "ok"}
 
 user_manager = UserManager()
 
@@ -58,7 +72,7 @@ async def create_user(new_user: UserCreate) -> JSONResponse:
     access_token, refresh_token = await register_user(new_user)
     response = JSONResponse(content={"message": "Пользователь успешно создан"})
     set_auth_cookies(response, access_token, refresh_token)
-    app_logger.info(f"Пользователь {new_user.id} успешно создан")
+    app_logger.info(f"Пользователь {new_user.login} успешно создан")
     return response
 
 @auth_router.post('/login',
@@ -91,8 +105,9 @@ async def refresh_access_token(response: Response,
                                user_id: int = Depends(validate_refresh_token)) -> Response:
     """Обновить access токен"""
     access_token = create_access_token({"sub": str(user_id)})
+    refresh_token = create_refresh_token({"sub": str(user_id)})
     response = JSONResponse(content={"message": "Access токен обновлен"})
-    response.set_cookie(JWT_ACCESS_COOKIE_NAME, access_token)
+    set_auth_cookies(response, access_token, refresh_token)
     app_logger.info(f"Access токен обновлен для пользователя user_id={user_id}")
     return response
 
@@ -109,3 +124,19 @@ async def logout(response: Response,
     clear_auth_cookies(response)
     app_logger.info(f"Пользователь {user.id} вышел из аккаунта")
     return response
+
+@auth_router.get('/token',
+                 summary='Получить access токен для WebSocket',
+                 status_code=status.HTTP_200_OK,
+                 responses=get_token_responses,
+                 description=get_token_description)
+@handle_api_errors("Ошибка при получении токена")
+async def get_websocket_token(user: User = Depends(get_current_user)) -> TokenResponse:
+    access_token = create_access_token({"sub": str(user.id)})
+
+    app_logger.info(f"WebSocket токен выдан пользователю {user.id}")
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=settings.jwt_access_token_expire_minutes * 60
+    )

@@ -55,7 +55,7 @@ auth_register_responses = {
                     "id": 1,
                     "login": "user",
                     "about": None,
-                    "avatar_url": None,
+                    "avatar_key": None,
                     "role": 0
                 }
             }
@@ -178,4 +178,46 @@ logout_description = (
     "Очищает куки авторизации. "
     "Требует авторизации. "
     "Возвращает сообщение об успешном выходе."
+)
+
+# === ПОЛУЧЕНИЕ ТОКЕНА ДЛЯ WEBSOCKET ===
+
+get_token_responses = {
+    status.HTTP_200_OK: {
+        "description": "Access токен успешно получен",
+        "content": {
+            "application/json": {
+                "example": {
+                    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "token_type": "bearer",
+                    "expires_in": 900
+                }
+            }
+        }
+    },
+    status.HTTP_401_UNAUTHORIZED: {
+        "description": "Не авторизован",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Пользователь не авторизован"}
+            }
+        }
+    },
+    status.HTTP_500_INTERNAL_SERVER_ERROR: {
+        "description": "Внутренняя ошибка сервера",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Внутренняя ошибка сервера"}
+            }
+        }
+    }
+}
+
+get_token_description = (
+    "Получить access токен для WebSocket соединений. "
+    "Возвращает токен в JSON формате (не в httpOnly куки), "
+    "который можно использовать в JavaScript для подключения к WebSocket. "
+    "Требует авторизации через обычные httpOnly куки. "
+    "Токен имеет то же время жизни, что и обычный access токен. "
+    "Возможные ошибки: пользователь не авторизован, ошибка сервера."
 ) 

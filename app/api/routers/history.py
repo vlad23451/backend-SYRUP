@@ -10,7 +10,7 @@
 from typing import Sequence
 
 from api.dependencies.auth import get_current_user
-from api.dependencies.ownership import get_history_or_error
+from api.dependencies.ownership import get_history_or_error_with_moderation
 from api.dependencies.pagination import get_small_pagination
 from api.docs.history import create_history_description
 from api.docs.history import delete_history_description
@@ -43,8 +43,8 @@ comment_manager = CommentManager()
 followers_manager = FollowersManager()
 friends_manager = FriendsManager()
 
-async def ensure_ownership(id: int, user: User = Depends(get_current_user)) -> History:
-    return await get_history_or_error(id=id, user=user)
+async def ensure_ownership_or_moderation(id: int, user: User = Depends(get_current_user)) -> History:
+    return await get_history_or_error_with_moderation(id=id, user=user)
 
 @history_router.post('/',
                      summary='Создать историю',
@@ -69,12 +69,6 @@ async def create_history(new_history: HistoryCreate,
 @handle_api_errors("Ошибка при получении всех историй")
 async def get_histories(user: User = Depends(get_current_user),
                         pagination: tuple[int, int] = Depends(get_small_pagination)) -> Sequence[HistoryOut]:
-    """Список всех историй (фид).
-
-    Данные формируются в `HistoryManager.get_histories`, который подгружает автора,
-    агрегирует счётчики и возвращает Pydantic-схемы. Возможен кэш на уровне
-    отдельных историй при повторном доступе.
-    """
     skip, limit = pagination
     return await history_manager.get_histories(skip, limit, me_user_id=user.id)
 
@@ -160,7 +154,7 @@ async def get_friends_histories(user: User = Depends(get_current_user),
 @handle_api_errors("Ошибка при обновлении истории")
 async def update_history(id: int,
                          history_update: HistoryUpdate,
-                         history: History = Depends(ensure_ownership)) -> HistoryOut:
+                         history: History = Depends(ensure_ownership_or_moderation)) -> HistoryOut:
     await history_manager.update_obj(id=id, updated_obj=history_update)
     await CacheInvalidationService.on_history_changed(history_id=id, author_id=history.author_id)
     history_out = await history_manager.get_history_by_id(id)
@@ -176,7 +170,7 @@ async def update_history(id: int,
                        description=delete_history_description)
 @handle_api_errors("Ошибка при удалении истории")
 async def delete_history(id: int,
-                         history: History = Depends(ensure_ownership)) -> Response:
+                         history: History = Depends(ensure_ownership_or_moderation)) -> Response:
     await history_manager.delete_obj(id)
     await CacheInvalidationService.on_history_changed(history_id=id, author_id=history.author_id)
     app_logger.info_event("history_deleted", history_id=id, user_id=history.author_id)

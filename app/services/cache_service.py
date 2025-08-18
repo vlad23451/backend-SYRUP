@@ -130,6 +130,31 @@ class HistoryCacheService:
         """Инвалидировать кэш истории"""
         await RedisCache.delete_by_prefix(f"history_with_counts:{history_id}:")
 
+
+class HistoryScoreCacheService:
+    """Кэш для сохранённых значений score по историям."""
+
+    @staticmethod
+    async def get_score(history_id: int) -> Optional[float]:
+        key = f"history_score:{history_id}"
+        value = await RedisCache.get(key)
+        if value is None:
+            return None
+        try:
+            # значение хранится как float или совместимый тип
+            return float(value)
+        except Exception:
+            return None
+
+    @staticmethod
+    async def set_score(history_id: int, score: float, ttl: int = 600) -> None:
+        key = f"history_score:{history_id}"
+        await RedisCache.set(key, float(score), ttl)
+
+    @staticmethod
+    async def invalidate_score(history_id: int) -> None:
+        await RedisCache.delete_by_prefix(f"history_score:{history_id}")
+
 class FollowersCacheService:
     """Кэш для списков подписчиков/подписок."""
     @staticmethod

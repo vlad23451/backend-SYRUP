@@ -16,6 +16,7 @@ from database.models.history_like import HistoryDislike, HistoryLike
 from database.models.user import User
 from exceptions.comment import OwnershipCommentError
 from exceptions.histories import OwnershipHistoryError
+from schemas.role import UserRole
 from exceptions.like import (OwnershipCommentDislikeError,
                              OwnershipCommentLikeError, OwnershipDislikeError,
                              OwnershipLikeError)
@@ -93,3 +94,53 @@ async def get_comment_dislike_or_error(id: int, user: User) -> CommentDislike:
         app_logger.warning(f"Пользователь {user.id} попытался получить доступ к дизлайку комментария {id}")
         raise OwnershipCommentDislikeError()
     return dislike
+
+
+async def get_history_or_error_with_moderation(id: int, user: User) -> History:
+    """
+    Проверить права доступа к истории с учетом ролей.
+    
+    Разрешает доступ если:
+    - Пользователь является автором истории
+    - Пользователь имеет роль модератора или выше
+    """
+    history = await history_manager.get_obj_by_id(id=id)
+    author_id = getattr(history, 'author_id', None) 
+    if author_id is None:
+        app_logger.error(f"Пользователь {author_id} не найден")
+        raise UserNotFoundError()
+    
+    if author_id == user.id:
+        return history
+
+    if UserRole.has_permission(user.role, UserRole.MODERATOR.value):
+        app_logger.info(f"Модератор {user.login} (ID: {user.id}) получил доступ к истории {id}")
+        return history
+    
+    app_logger.warning(f"Пользователь {user.id} попытался получить доступ к истории {id}")
+    raise OwnershipHistoryError()
+
+
+async def get_comment_or_error_with_moderation(id: int, user: User) -> Comment:
+    """
+    Проверить права доступа к комментарию с учетом ролей.
+    
+    Разрешает доступ если:
+    - Пользователь является автором комментария
+    - Пользователь имеет роль модератора или выше
+    """
+    comment = await comment_manager.get_obj_by_id(id=id)
+    user_id = getattr(comment, 'user_id', None)
+    if user_id is None:
+        app_logger.error(f"Пользователь {user_id} не найден")
+        raise UserNotFoundError()
+    
+    if user_id == user.id:
+        return comment
+    
+    if UserRole.has_permission(user.role, UserRole.MODERATOR.value):
+        app_logger.info(f"Модератор {user.login} (ID: {user.id}) получил доступ к комментарию {id}")
+        return comment
+    
+    app_logger.warning(f"Пользователь {user.id} попытался получить доступ к комментарию {id}")
+    raise OwnershipCommentError()

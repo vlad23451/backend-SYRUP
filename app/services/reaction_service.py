@@ -14,6 +14,7 @@ from schemas.like import (CommentDislikeOut, CommentLikeOut, HistoryDislikeOut,
 from schemas.user import UserShortOutWithFollowStatus
 from services.cache_invalidation_service import CacheInvalidationService
 from services.user_info_service import build_user_info
+from services.score_service import ScoreService
 
 
 class ReactionService:
@@ -97,6 +98,7 @@ class ReactionService:
         else:
             target = existing
         await CacheInvalidationService.on_reaction_changed(history_id=history_id, me_user_id=me.id)
+        await ScoreService.recompute_for_history_id(history_id)
         return await self._build_history_like_out(me_user_id=me.id, like_obj=target)
 
     async def get_history_like(self, history_id: int, me: User) -> Optional[HistoryLikeOut]:
@@ -108,6 +110,7 @@ class ReactionService:
     async def delete_history_like(self, history_id: int, me: User) -> None:
         await self.like_manager.delete_by_user_and_target(user_id=me.id, target_id=history_id)
         await CacheInvalidationService.on_reaction_changed(history_id=history_id, me_user_id=me.id)
+        await ScoreService.recompute_for_history_id(history_id)
 
     async def create_history_dislike(self, history_id: int, me: User) -> HistoryDislikeOut:
         await self.like_manager.delete_by_user_and_target(user_id=me.id, target_id=history_id)
@@ -119,6 +122,7 @@ class ReactionService:
         else:
             target = existing
         await CacheInvalidationService.on_reaction_changed(history_id=history_id, me_user_id=me.id)
+        await ScoreService.recompute_for_history_id(history_id)
         return await self._build_history_dislike_out(me_user_id=me.id, dislike_obj=target)
 
     async def get_history_dislike(self, history_id: int, me: User) -> Optional[HistoryDislikeOut]:
@@ -130,6 +134,7 @@ class ReactionService:
     async def delete_history_dislike(self, history_id: int, me: User) -> None:
         await self.dislike_manager.delete_by_user_and_target(user_id=me.id, target_id=history_id)
         await CacheInvalidationService.on_reaction_changed(history_id=history_id, me_user_id=me.id)
+        await ScoreService.recompute_for_history_id(history_id)
 
     # Comment reactions
     async def create_comment_like(self, comment_id: int, me: User) -> CommentLikeOut:
