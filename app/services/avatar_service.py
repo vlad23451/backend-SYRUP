@@ -1,9 +1,12 @@
 from typing import Optional
 
+from fastapi import HTTPException 
+from fastapi import UploadFile
+from fastapi import status
+
 from core.logger import app_logger
 from database.managers.user_manager import UserManager
 from database.models.user import User
-from fastapi import HTTPException, UploadFile, status
 from services.file_validation_service import FileValidationService
 from services.s3_service import S3Service
 

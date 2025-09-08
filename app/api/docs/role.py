@@ -1,6 +1,3 @@
-"""Документация для API ролей пользователей."""
-
-# Описания для endpoints
 get_available_roles_description = """
 ## Получить все доступные роли
 
@@ -63,7 +60,6 @@ get_role_statistics_description = """
 - Доступно только администраторам
 """
 
-# Ответы для endpoints
 role_responses = {
     200: {"description": "Успешное выполнение операции"},
     400: {"description": "Некорректные данные запроса"},

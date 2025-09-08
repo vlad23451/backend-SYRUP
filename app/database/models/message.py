@@ -15,6 +15,7 @@ from sqlalchemy.orm import relationship
 
 if TYPE_CHECKING:
     from .user import User
+    from .chat import Chat
 
 class MessageType(EnumType):
     TEXT = "text"
@@ -28,9 +29,8 @@ class Message(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     sender_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False, index=True)
-    receiver_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False, index=True)
-    room_id: Mapped[str] = mapped_column(nullable=False, index=True)
-    
+    chat_id: Mapped[int] = mapped_column(ForeignKey('chats.id'), nullable=False, index=True)
+
     text: Mapped[str] = mapped_column(nullable=False)
     message_type: Mapped[str] = mapped_column(
         Enum(MessageType, values_callable=lambda x: [e.value for e in MessageType]),
@@ -39,8 +39,13 @@ class Message(Base):
     )
     timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     is_read: Mapped[bool] = mapped_column(default=False, nullable=False)
-    
+
     message_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
 
+    # Новые поля для операций
+    #edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    #is_deleted: Mapped[bool] = mapped_column(default=False, nullable=False)
+    #is_pinned: Mapped[bool] = mapped_column(default=False, nullable=False)
+
     sender: Mapped["User"] = relationship('User', foreign_keys=[sender_id], backref='sent_messages')
-    receiver: Mapped["User"] = relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+    chat: Mapped["Chat"] = relationship('Chat', back_populates='messages')

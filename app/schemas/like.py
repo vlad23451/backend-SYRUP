@@ -1,10 +1,10 @@
 from datetime import datetime
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
+
 from schemas.user import UserShortOutWithFollowStatus
 
-
-# History Like Schemas
 class HistoryLikeBase(BaseModel):
     history_id: int
 
@@ -21,10 +21,8 @@ class HistoryLikeOut(BaseModel):
     created_at: datetime
     user_info: UserShortOutWithFollowStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-# History Dislike Schemas
 class HistoryDislikeBase(BaseModel):
     history_id: int
 
@@ -41,10 +39,8 @@ class HistoryDislikeOut(BaseModel):
     created_at: datetime
     user_info: UserShortOutWithFollowStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-# Comment Like Schemas
 class CommentLikeBase(BaseModel):
     comment_id: int
 
@@ -61,10 +57,8 @@ class CommentLikeOut(BaseModel):
     created_at: datetime
     user_info: UserShortOutWithFollowStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-# Comment Dislike Schemas
 class CommentDislikeBase(BaseModel):
     comment_id: int
 
@@ -81,5 +75,4 @@ class CommentDislikeOut(BaseModel):
     created_at: datetime
     user_info: UserShortOutWithFollowStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

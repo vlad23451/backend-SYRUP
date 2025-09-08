@@ -1,6 +1,6 @@
 from core.logger import app_logger
-from database.config import Base, engine
-
+from database.config import Base
+from database.config import engine
 
 async def init_db():
     async with engine.begin() as conn:

@@ -1,11 +1,6 @@
-"""Главный роутер приложения.
-
-Агрегирует и подключает все подроутеры (auth, user, followers, friends, history,
-comment, like/dislike, message, websocket). 
-Поддерживает чистую структуру и лёгкую масштабируемость API.
-"""
-from api.routers import *
 from fastapi import APIRouter
+
+from api.routers import *
 
 main_router = APIRouter()
 
@@ -22,3 +17,4 @@ main_router.include_router(comment_dislike)
 main_router.include_router(websocket)
 main_router.include_router(message)
 main_router.include_router(role)
+main_router.include_router(media)

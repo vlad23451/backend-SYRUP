@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from .history_like import HistoryLike, HistoryDislike
     from .comments import Comment
     from .history_score import HistoryScore
+    from .media_file import MediaFile
 
 class History(Base):
     __tablename__ = 'histories'
@@ -62,4 +63,8 @@ class History(Base):
 
     score_rel: Mapped["HistoryScore"] = relationship(
         'HistoryScore', back_populates='history', uselist=False, cascade='all, delete-orphan'
+    )
+    
+    media_files: Mapped[list["MediaFile"]] = relationship(
+        'MediaFile', back_populates='history', cascade='all, delete-orphan'
     )

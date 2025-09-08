@@ -1,4 +1,3 @@
-
 comment_create_responses_raw = {
     "201": {
         "description": "Комментарий успешно создан.",

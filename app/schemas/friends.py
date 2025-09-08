@@ -1,7 +1,4 @@
-from datetime import datetime
-
 from pydantic import BaseModel
-
 
 class FriendBase(BaseModel):
     user_id: int

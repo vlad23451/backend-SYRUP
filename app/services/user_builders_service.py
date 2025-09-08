@@ -3,7 +3,6 @@ from typing import Dict, List
 from schemas.user import UserShortOutWithFollowStatus
 from services.user_info_service import build_user_info
 
-
 async def build_user_list(rows, me_user_id):
     result = []
     if me_user_id is None:

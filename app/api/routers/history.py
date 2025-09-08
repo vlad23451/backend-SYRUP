@@ -6,12 +6,17 @@
 - Обработка ошибок — через декоратор `handle_api_errors`, который конвертирует
   неожиданные исключения в единый тип `DatabaseError` и логирует их.
 """
-
 from typing import Sequence
+
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import Response
+from fastapi import status
 
 from api.dependencies.auth import get_current_user
 from api.dependencies.ownership import get_history_or_error_with_moderation
 from api.dependencies.pagination import get_small_pagination
+
 from api.docs.history import create_history_description
 from api.docs.history import delete_history_description
 from api.docs.history import get_histories_description
@@ -22,17 +27,21 @@ from api.docs.history import history_get_all_responses
 from api.docs.history import history_get_responses
 from api.docs.history import history_update_responses
 from api.docs.history import update_history_description
-from database.managers.friends_manager import FriendsManager
+
 from core.logger import app_logger
+
+from database.managers.friends_manager import FriendsManager
 from database.managers.comment_manager import CommentManager
 from database.managers.history_manager import HistoryManager
 from database.managers.followers_manager import FollowersManager
 from database.models.history import History
 from database.models.user import User
+
 from exceptions.histories import HistoryNotFoundError
-from fastapi import APIRouter, Depends, Response, status
+
 from schemas.comment import CommentOut
 from schemas.history import HistoryCreate, HistoryOut, HistoryUpdate
+
 from services.cache_invalidation_service import CacheInvalidationService
 from services.error_handler_service import handle_api_errors
 

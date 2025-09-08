@@ -1,9 +1,6 @@
-"""Сервис для валидации загружаемых файлов."""
-
 from core.config import settings
 from exceptions.s3 import S3ValidationError
 from fastapi import UploadFile
-
 
 class FileValidationService:
     """Сервис для валидации различных типов файлов."""

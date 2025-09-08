@@ -1,13 +1,7 @@
-"""Конфигурация базы данных и базовый класс ORM.
-
-Здесь создаётся асинхронный движок SQLAlchemy, фабрика сессий и базовый
-декларативный класс `Base` для всех моделей проекта. Используется стиль
-SQLAlchemy 2.0 (DeclarativeBase).
-"""
-
 from core.config import settings
 from core.logger import app_logger
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 engine = create_async_engine(
@@ -26,10 +20,5 @@ AsyncSessionLocal = async_sessionmaker(
 
 app_logger.info(f"Создана асинхронная сессия базы данных")
 
-
 class Base(DeclarativeBase):
-    """Базовый декларативный класс для всех ORM-моделей.
-
-    Все модели в проекте должны наследоваться от этого класса.
-    """
     pass

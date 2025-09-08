@@ -2,9 +2,11 @@ from datetime import datetime
 from typing import List
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
+
 from schemas.author import AuthorOut
 from schemas.user import UserShortOutWithFollowStatus
-
+from schemas.file import FileOut
 
 class HistoryCreate(BaseModel):
     title: str
@@ -19,12 +21,12 @@ class HistoryOut(BaseModel):
     comments: int
     liked_users: List[UserShortOutWithFollowStatus] = []
     disliked_users: List[UserShortOutWithFollowStatus] = []
+    attached_files: List[FileOut] = []
     author: AuthorOut | None
     created_at: datetime
     updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @classmethod
     def from_model_with_counts(
@@ -35,6 +37,7 @@ class HistoryOut(BaseModel):
         comments: int = 0,
         liked_users: List[UserShortOutWithFollowStatus] | None = None,
         disliked_users: List[UserShortOutWithFollowStatus] | None = None,
+        attached_files: List[FileOut] | None = None,
     ) -> "HistoryOut":
         base = cls.model_validate(history_obj)
         return base.model_copy(update={
@@ -43,6 +46,7 @@ class HistoryOut(BaseModel):
             "comments": int(comments or 0),
             "liked_users": liked_users or [],
             "disliked_users": disliked_users or [],
+            "attached_files": attached_files or [],
         })
 
 class HistoryOutShort(BaseModel):
@@ -54,11 +58,11 @@ class HistoryOutShort(BaseModel):
     comments: int
     liked_users: List[UserShortOutWithFollowStatus] = []
     disliked_users: List[UserShortOutWithFollowStatus] = []
+    attached_files: List[FileOut] = []
     created_at: datetime
     updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @classmethod
     def from_model_with_counts(
@@ -69,6 +73,7 @@ class HistoryOutShort(BaseModel):
         comments: int = 0,
         liked_users: List[UserShortOutWithFollowStatus] | None = None,
         disliked_users: List[UserShortOutWithFollowStatus] | None = None,
+        attached_files: List[FileOut] | None = None,
     ) -> "HistoryOutShort":
         base = cls.model_validate(history_obj)
         return base.model_copy(update={
@@ -77,6 +82,7 @@ class HistoryOutShort(BaseModel):
             "comments": int(comments or 0),
             "liked_users": liked_users or [],
             "disliked_users": disliked_users or [],
+            "attached_files": attached_files or [],
         })
 
 class HistoryUpdate(BaseModel):

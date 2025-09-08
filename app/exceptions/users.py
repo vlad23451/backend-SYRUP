@@ -1,5 +1,5 @@
-from fastapi import HTTPException, status
-
+from fastapi import HTTPException
+from fastapi import status
 
 class UserAlreadyExistsError(HTTPException):
     def __init__(self, detail: str = "Пользователь с таким логином уже существует"):

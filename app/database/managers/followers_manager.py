@@ -1,3 +1,7 @@
+from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.future import select
+
 from core.logger import app_logger
 
 from database.managers.session_manager import Manager
@@ -9,10 +13,6 @@ from exceptions.follow import FollowAlredyExists
 
 from services.cache_service import FollowersCacheService
 from services.cache_invalidation_service import CacheInvalidationService
-
-from sqlalchemy import and_
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.future import select
 
 class FollowersManager:
     def __init__(self):

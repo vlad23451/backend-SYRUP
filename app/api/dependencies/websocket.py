@@ -1,9 +1,12 @@
+from jose import JWTError
+
 from core.jwt import decode_token
+
 from database.managers.user_manager import UserManager
 from database.models.user import User
+
 from exceptions.base import ValidationError
 from exceptions.users import UserNotFoundError
-from jose import JWTError
 
 user_manager = UserManager()
 

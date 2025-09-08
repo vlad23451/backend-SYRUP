@@ -1,10 +1,10 @@
-"""Зависимости для проверки ролей пользователей."""
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import status
 
-from fastapi import Depends, HTTPException, status
+from api.dependencies.auth import get_current_user
 from database.models.user import User
 from schemas.role import UserRole
-from api.dependencies.auth import get_current_user
-
 
 def require_role(required_role: int):
     """
@@ -25,7 +25,6 @@ def require_role(required_role: int):
         return current_user
     return check_role
 
-
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Требует роль администратора."""
     if current_user.role != UserRole.ADMIN.value:
@@ -35,7 +34,6 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
-
 def require_moderator_or_above(current_user: User = Depends(get_current_user)) -> User:
     """Требует роль модератора или выше."""
     if not UserRole.has_permission(current_user.role, UserRole.MODERATOR.value):
@@ -44,7 +42,6 @@ def require_moderator_or_above(current_user: User = Depends(get_current_user)) -
             detail="Доступ запрещен. Требуются права модератора или администратора."
         )
     return current_user
-
 
 def check_ownership_or_moderator(target_user_id: int):
     """
@@ -67,7 +64,6 @@ def check_ownership_or_moderator(target_user_id: int):
             detail="Доступ запрещен. Недостаточно прав."
         )
     return check_permission
-
 
 def get_user_permissions(current_user: User = Depends(get_current_user)) -> dict:
     """

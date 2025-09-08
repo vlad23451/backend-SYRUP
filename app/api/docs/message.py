@@ -8,7 +8,7 @@ message_send_responses = {
                 "example": {
                     "id": 1,
                     "sender_id": 2,
-                    "receiver_id": 3,
+                    "room_id": "room_123",
                     "text": "Привет!",
                     "timestamp": "2024-05-01T12:00:00",
                     "from_me": True
@@ -61,7 +61,9 @@ get_chats_responses_raw = {
                         "companion_avatar_url": "avatars/example-companion.jpg",
                         "last_message": "Привет!",
                         "last_message_time": "2024-05-01T12:00:00",
-                        "from_me": True
+                        "from_me": True,
+                        "room_id": "room_123",
+                        "is_read": False
                     }
                 ]
             }

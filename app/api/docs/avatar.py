@@ -1,8 +1,4 @@
-"""Документация для API аватаров пользователей."""
-
 from fastapi import status
-
-# === RESPONSES ===
 
 avatar_get_responses = {
     status.HTTP_200_OK: {
@@ -108,8 +104,6 @@ avatar_upload_responses = {
         }
     }
 }
-
-# === DESCRIPTIONS ===
 
 get_user_avatar_description = (
     "Получает временную ссылку на аватар пользователя по его ID. "

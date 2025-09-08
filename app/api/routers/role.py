@@ -1,27 +1,38 @@
-"""Роуты для управления ролями пользователей."""
-
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from database.models.user import User
-from database.managers.user_manager import UserManager
-from schemas.role import UserRole, RoleOut, RoleUpdate
-from schemas.user import UserOut
-from api.dependencies.role import require_admin, get_user_permissions
-from api.dependencies.auth import get_current_user
-from services.error_handler_service import handle_api_errors
+
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import HTTPException
+from fastapi import status
+
+from api.dependencies.role import require_admin
+from api.dependencies.role import get_user_permissions
+from api.docs.role import get_available_roles_description
+from api.docs.role import available_roles_responses
+from api.docs.role import get_my_permissions_description
+from api.docs.role import permissions_responses
+from api.docs.role import update_user_role_description
+from api.docs.role import update_role_responses
+from api.docs.role import get_users_by_role_description
+from api.docs.role import users_by_role_responses
+from api.docs.role import get_role_statistics_description
+from api.docs.role import statistics_responses
+
 from core.logger import app_logger
-from api.docs.role import (
-    get_available_roles_description, available_roles_responses,
-    get_my_permissions_description, permissions_responses,
-    update_user_role_description, update_role_responses,
-    get_users_by_role_description, users_by_role_responses,
-    get_role_statistics_description, statistics_responses
-)
+
+from database.managers.user_manager import UserManager
+from database.models.user import User
+
+from schemas.role import RoleOut
+from schemas.role import RoleUpdate
+from schemas.role import UserRole
+from schemas.user import UserOut
+
+from services.error_handler_service import handle_api_errors
 
 role_router = APIRouter(prefix='/roles', tags=['Роли пользователей'])
 
 user_manager = UserManager()
-
 
 @role_router.get('/available',
                  summary='Получить все доступные роли',
@@ -47,7 +58,6 @@ async def get_available_roles() -> List[RoleOut]:
     
     return roles
 
-
 @role_router.get('/my-permissions',
                  summary='Получить мои права доступа',
                  status_code=status.HTTP_200_OK,
@@ -56,7 +66,6 @@ async def get_available_roles() -> List[RoleOut]:
 async def get_my_permissions(permissions: dict = Depends(get_user_permissions)) -> dict:
     """Получить информацию о правах текущего пользователя."""
     return permissions
-
 
 @role_router.put('/update-user-role',
                  summary='Изменить роль пользователя',
@@ -120,7 +129,6 @@ async def update_user_role(
     
     return user_out
 
-
 @role_router.get('/users-by-role/{role_id}',
                  summary='Получить пользователей по роли',
                  status_code=status.HTTP_200_OK,
@@ -152,7 +160,6 @@ async def get_users_by_role(
         result.append(user_out)
     
     return result
-
 
 @role_router.get('/statistics',
                  summary='Статистика по ролям',

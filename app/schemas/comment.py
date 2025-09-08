@@ -1,9 +1,8 @@
 from datetime import datetime
-from typing import List, Literal
+from typing import List
 
 from pydantic import BaseModel
-from schemas.user import UserShortOut, UserShortOutWithFollowStatus
-
+from schemas.user import UserShortOutWithFollowStatus
 
 class CommentBase(BaseModel):
     content: str

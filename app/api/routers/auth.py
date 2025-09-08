@@ -8,7 +8,11 @@
   refresh-токена.
 - Все неожиданные ошибки оборачиваются `handle_api_errors` в единый ответ.
 """
-from api.auth_config import JWT_ACCESS_COOKIE_NAME, JWT_REFRESH_COOKIE_NAME
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import Response
+from fastapi import status
+from fastapi.responses import JSONResponse
 
 from api.dependencies.auth import get_current_user
 from api.dependencies.auth import validate_refresh_token
@@ -26,17 +30,12 @@ from api.docs.auth import get_token_description
 
 from core.cookie import clear_auth_cookies
 from core.cookie import set_auth_cookies
-from core.jwt import create_access_token, create_refresh_token
+from core.jwt import create_access_token
+from core.jwt import create_refresh_token
 from core.logger import app_logger
 from core.config import settings
 
 from database.models.user import User
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Response
-from fastapi import status
-from fastapi.responses import JSONResponse
 
 from schemas.user import UserAuth
 from schemas.user import UserCreate
@@ -48,16 +47,6 @@ from services.auth_service import register_user
 from services.error_handler_service import handle_api_errors
 
 auth_router = APIRouter(prefix='/auth', tags=['Аутентификация'])
-
-# Explicit OPTIONS handlers для CORS preflight (если CORS middleware не работает)
-@auth_router.options('/login')
-@auth_router.options('/register') 
-@auth_router.options('/refresh')
-@auth_router.options('/logout')
-@auth_router.options('/token')
-async def options_handler():
-    """Обработка CORS preflight запросов"""
-    return {"status": "ok"}
 
 user_manager = UserManager()
 

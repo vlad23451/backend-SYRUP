@@ -4,15 +4,20 @@
 реализует добавление/удаление дружбы, выборку друзей с кэшем и корректную
 инвалидацию зависимых кэшей.
 """
+from sqlalchemy import and_
+from sqlalchemy.future import select
+
 from core.logger import app_logger
+
 from database.managers.followers_manager import FollowersManager
 from database.managers.session_manager import Manager
 from database.models.friends import Friend
-from exceptions.base import DatabaseError, ModelNotFoundError
+
+from exceptions.base import DatabaseError
+from exceptions.base import ModelNotFoundError
+
 from services.cache_service import FriendsCacheService
 from services.cache_invalidation_service import CacheInvalidationService
-from sqlalchemy import and_
-from sqlalchemy.future import select
 
 class FriendsManager:
     def __init__(self):

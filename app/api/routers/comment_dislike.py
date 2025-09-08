@@ -1,3 +1,8 @@
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import Response
+from fastapi import status
+
 from api.dependencies.auth import get_current_user
 
 from api.docs.like import create_like_description
@@ -12,11 +17,6 @@ from core.logger import app_logger
 from database.models.user import User
 
 from exceptions.like import CommentDislikeNotFoundError
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Response
-from fastapi import status
 
 from schemas.like import CommentDislikeCreate
 from schemas.like import CommentDislikeOut

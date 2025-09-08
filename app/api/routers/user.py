@@ -1,6 +1,13 @@
 import asyncio
 from typing import List
 
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import File
+from fastapi import Response
+from fastapi import UploadFile
+from fastapi import status
+
 from api.dependencies.auth import get_current_user
 from api.dependencies.pagination import get_large_pagination
 
@@ -27,17 +34,9 @@ from core.logger import app_logger
 from database.managers.followers_manager import FollowersManager
 from database.managers.friends_manager import FriendsManager
 from database.managers.history_manager import HistoryManager
-
 from database.managers.user_manager import UserManager
 
 from database.models.user import User
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import File
-from fastapi import Response
-from fastapi import UploadFile
-from fastapi import status 
 
 from schemas.avatar import AvatarResponse
 from schemas.avatar import UploadAvatarResponse
@@ -50,9 +49,9 @@ from schemas.user import UpdateUser
 from schemas.user import UserOut
 from schemas.user import UserShortOutWithFollowStatus
 
+from services.avatar_service import avatar_service
 from services.cache_service import UsersSearchCacheService
 from services.cache_invalidation_service import CacheInvalidationService
-from services.avatar_service import avatar_service
 from services.error_handler_service import handle_api_errors
 from services.user_info_service import build_user_info
 from services.user_info_service import build_user_info_many

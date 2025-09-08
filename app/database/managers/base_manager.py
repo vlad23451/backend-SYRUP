@@ -5,14 +5,17 @@
 `BaseManager` типизирован: `TModel` — ORM-модель, `TUpdate` — pydantic-модель
 обновления (partial update).
 """
-
 from abc import ABC
 from collections.abc import Sequence
-from typing import List, Optional, Type, TypeVar
+from typing import List 
+from typing import Type
+from typing import TypeVar
 
 from core.logger import app_logger
 from database.managers.session_manager import Manager
-from exceptions.base import DatabaseError, ModelNotFoundError
+from exceptions.base import DatabaseError
+from exceptions.base import ModelNotFoundError
+
 from pydantic import BaseModel
 from sqlalchemy.future import select
 
@@ -43,7 +46,7 @@ class BaseManager[TModel, TUpdate](ABC):
                 app_logger.exception(f"{self._model.__name__} не создан Traceback: {e}")
                 raise DatabaseError()
 
-    async def get_obj_by_id(self, id: int, options: Optional[List] = None) -> TModel:
+    async def get_obj_by_id(self, id: int, options: List | None = None) -> TModel:
         """Получить объект по ID с опциональными ORM-опциями (joinedload и т.п.)."""
         if options is None:
             options = []
@@ -65,7 +68,7 @@ class BaseManager[TModel, TUpdate](ABC):
             raise DatabaseError()
 
     async def get_all_obj(self,
-                          options: Optional[List] = None,
+                          options: List | None = None,
                           skip: int = 0,
                           limit: int = 100) -> Sequence[TModel]:
         """Получить список объектов с пагинацией и опциями подгрузки."""

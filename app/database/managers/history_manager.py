@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Dict
 from typing import List
-from typing import Optional
 from typing import Tuple
 from typing import TypeVar
 
@@ -15,21 +14,21 @@ from database.models.history import History
 from database.models.history_like import HistoryDislike
 from database.models.history_like import HistoryLike
 from database.models.history_score import HistoryScore
+from database.models.media_file import MediaFile
 from database.models.user import User
 
 from exceptions.base import DatabaseError
 from exceptions.histories import HistoryNotFoundError
 
+from schemas.file import FileOut
 from schemas.history import HistoryOut
 from schemas.history import HistoryOutShort
 from schemas.history import HistoryUpdate
 from schemas.user import UserShortOutWithFollowStatus
 
-from services.cache_service import (
-    HistoriesByAuthorCacheService,
-    FriendsHistoriesCacheService,
-    FollowingHistoriesCacheService,
-)
+from services.cache_service import HistoriesByAuthorCacheService
+from services.cache_service import FriendsHistoriesCacheService
+from services.cache_service import FollowingHistoriesCacheService
 from services.cache_service import HistoryCacheService
 from services.user_builders_service import build_user_list
 from services.user_builders_service import build_users_map
@@ -188,12 +187,12 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
 
     # History Fetch Helpers
 
-    async def _fetch_history_by_id_with_author(self, id: int) -> Optional[History]:
+    async def _fetch_history_by_id_with_author(self, id: int) -> History | None:
         async with self.manager.get_async_session() as session:
             result = await session.execute(HistoryManager._select_with_author_by_id(id))
             return result.scalars().first()
 
-    async def _fetch_history_by_id(self, id: int) -> Optional[History]:
+    async def _fetch_history_by_id(self, id: int) -> History | None:
         try:
             async with self.manager.get_async_session() as session:
                 result = await session.execute(select(History).where(History.id == id))
@@ -225,11 +224,12 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
     async def _build_histories_with_counts(self,
                                            histories: List[History],
                                            schema_class: type[T],
-                                           me_user_id: Optional[int] = None) -> List[T]:
+                                           me_user_id: int | None= None) -> List[T]:
         history_ids = [h.id for h in histories]
         likes_map, dislikes_map = await self._get_like_dislike_maps(history_ids)
         comments_map = await self._fetch_comments_map(history_ids)
         liked_users_map, disliked_users_map = await self._fetch_users_maps(history_ids, me_user_id)
+        attached_files_map = await self._fetch_attached_files_map(history_ids)
 
         return [
             schema_class.from_model_with_counts(
@@ -239,6 +239,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 comments=comments_map.get(h.id, 0),
                 liked_users=liked_users_map.get(h.id, []),
                 disliked_users=disliked_users_map.get(h.id, []),
+                attached_files=attached_files_map.get(h.id, []),
             ) for h in histories
         ]
 
@@ -246,7 +247,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
 
     async def _fetch_users_for_history(self,
                                      history_id: int,
-                                     me_user_id: Optional[int]) -> Tuple[List[UserShortOutWithFollowStatus]]:
+                                     me_user_id: int | None) -> Tuple[List[UserShortOutWithFollowStatus]]:
         try:
             async with self.manager.get_async_session() as session:
                 liked_rows = await session.execute(
@@ -264,7 +265,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
     
     async def _fetch_users_maps(self,
                                 history_ids: List[int],
-                                me_user_id: Optional[int]) -> Tuple[Dict[int, List[UserShortOutWithFollowStatus]]]:
+                                me_user_id: int | None) -> Tuple[Dict[int, List[UserShortOutWithFollowStatus]]]:
         try:
             async with self.manager.get_async_session() as session:
                 liked_rows = await session.execute(
@@ -287,7 +288,10 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
 
     async def _fetch_count(self, model, history_id: int) -> int:
         async with self.manager.get_async_session() as session:
-            result = await session.execute(select(func.count(model.id)).where(model.history_id == history_id))
+            result = await session.execute(
+                select(func.count(model.id)).
+                where(model.history_id == history_id)
+                )
             return int(result.scalar_one() or 0)
 
     async def _fetch_comments_map(self, history_ids: List[int]) -> Dict[int, int]:
@@ -295,12 +299,50 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             result = await session.execute(HistoryManager._select_comments_count_for_histories(history_ids))
             return {hid: int(cnt) for hid, cnt in result.all()}
 
+    async def _fetch_attached_files(self, history_id: int) -> List[FileOut]:
+        """Получает файлы, прикрепленные к истории."""
+        try:
+            async with self.manager.get_async_session() as session:
+                result = await session.execute(
+                    select(MediaFile).where(MediaFile.history_id == history_id)
+                    .order_by(MediaFile.created_at)
+                )
+                media_files = result.scalars().all()
+                
+                # Преобразуем MediaFile в FileOut
+                return [FileOut.model_validate(media_file) for media_file in media_files]
+        except Exception as e:
+            app_logger.error(f"Ошибка получения файлов для истории {history_id}: {e}")
+            return []
+
+    async def _fetch_attached_files_map(self, history_ids: List[int]) -> Dict[int, List[FileOut]]:
+        """Получает файлы для нескольких историй."""
+        try:
+            async with self.manager.get_async_session() as session:
+                result = await session.execute(
+                    select(MediaFile).where(MediaFile.history_id.in_(history_ids))
+                    .order_by(MediaFile.history_id, MediaFile.created_at)
+                )
+                media_files = result.scalars().all()
+                
+                # Группируем файлы по history_id
+                files_map: Dict[int, List[FileOut]] = {}
+                for media_file in media_files:
+                    if media_file.history_id not in files_map:
+                        files_map[media_file.history_id] = []
+                    files_map[media_file.history_id].append(FileOut.model_validate(media_file))
+                
+                return files_map
+        except Exception as e:
+            app_logger.error(f"Ошибка получения файлов для историй {history_ids}: {e}")
+            return {}
+
     # Main Public Methods
 
     async def get_histories(self,
                             skip: int,
                             limit: int = 10,
-                            me_user_id: Optional[int] = None) -> List[HistoryOut]:
+                            me_user_id: int | None = None) -> List[HistoryOut]:
         try:
             histories = await self._fetch_histories_with_author(skip, limit)
             if not histories:
@@ -315,7 +357,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                                          author_id: int,
                                          skip: int = 0,
                                          limit: int = 5,
-                                         me_user_id: Optional[int] = None) -> List[HistoryOutShort]:
+                                         me_user_id: int | None = None) -> List[HistoryOutShort]:
         try:
             cached = await HistoriesByAuthorCacheService.get_histories(author_id=author_id,
                                         skip=skip, limit=limit, me_user_id=me_user_id or 0)
@@ -338,7 +380,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                                                      author_id: int,
                                                      skip: int = 0,
                                                      limit: int = 5,
-                                                     me_user_id: Optional[int] = None) -> List[HistoryOut]:
+                                                     me_user_id: int | None = None) -> List[HistoryOut]:
         try:
             histories = await self._fetch_histories_by_author_with_author(author_id, skip, limit)
             if not histories:
@@ -353,7 +395,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                                     friends_ids: List[int],
                                     skip: int = 0,
                                     limit: int = 10,
-                                    me_user_id: Optional[int] = None) -> List[HistoryOut]:
+                                    me_user_id: int | None = None) -> List[HistoryOut]:
         try:
             cached = await FriendsHistoriesCacheService.get_histories(
                 user_id=user_id, skip=skip, limit=limit, me_user_id=me_user_id or 0
@@ -382,7 +424,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                                       following_user_ids: List[int],
                                       skip: int = 0,
                                       limit: int = 10,
-                                      me_user_id: Optional[int] = None) -> List[HistoryOut]:
+                                      me_user_id: int | None= None) -> List[HistoryOut]:
         try:
             cached = await FollowingHistoriesCacheService.get_histories(
                 user_id=user_id, skip=skip, limit=limit, me_user_id=me_user_id or 0
@@ -409,7 +451,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             app_logger.exception(f"Ошибка при получении историй подписок пользователя {user_id}: {e}")
             raise DatabaseError(f"Ошибка при получении историй подписок пользователя")
 
-    async def get_history_by_id(self, id: int, me_user_id: Optional[int] = None) -> HistoryOut | None:
+    async def get_history_by_id(self, id: int, me_user_id: int | None= None) -> HistoryOut | None:
         try:
             cached = await HistoryCacheService.get_history_with_counts(history_id=id, me_user_id=me_user_id or 0)
             if cached is not None:
@@ -422,6 +464,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             likes, dislikes = await self._get_single_like_dislike_counts(id)
             liked_users, disliked_users = await self._fetch_users_for_history(id, me_user_id)
             comments_map = await self._fetch_comments_map([id])
+            attached_files = await self._fetch_attached_files(id)
             
             result = HistoryOut.from_model_with_counts(
                 history_obj=history,
@@ -430,6 +473,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 comments=comments_map.get(id, 0),
                 liked_users=liked_users,
                 disliked_users=disliked_users,
+                attached_files=attached_files,
             )
             await HistoryCacheService.set_history_with_counts(history_id=id, me_user_id=me_user_id or 0, history_data=result)
             return result

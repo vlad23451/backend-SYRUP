@@ -7,21 +7,27 @@
 """
 import asyncio
 
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import status
+
 from api.dependencies.auth import get_current_user
 from api.dependencies.pagination import get_large_pagination
-from api.docs.friends import (friend_create_responses, friend_delete_responses,
-                              friend_get_responses,
-                              friend_update_status_responses,
-                              get_friends_description,
-                              remove_friend_description)
+
+from api.docs.friends import friend_get_responses
+from api.docs.friends import get_friends_description
+
 from core.logger import app_logger
+
 from database.managers.friends_manager import FriendsManager
 from database.managers.user_manager import UserManager
+
 from database.models.user import User
-from fastapi import APIRouter, Depends, status
+
 from schemas.user import UserShortOutWithFollowStatus
+
 from services.error_handler_service import handle_api_errors
-from services.user_info_service import build_user_info, build_user_info_many
+from services.user_info_service import build_user_info_many
 
 friends_router = APIRouter(prefix="/friends", tags=["Друзья"])
 

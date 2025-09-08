@@ -1,5 +1,5 @@
-from fastapi import HTTPException, status
-
+from fastapi import HTTPException
+from fastapi import status
 
 class FollowAlredyExists(HTTPException):
     def __init__(self, detail: str = "Вы уже подписаны"):

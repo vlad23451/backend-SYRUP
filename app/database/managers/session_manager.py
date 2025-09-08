@@ -5,11 +5,14 @@
 """
 
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Self
+from typing import Any 
+from typing import AsyncGenerator
+from typing import Self
 
-from database.config import AsyncSessionLocal, engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from database.config import AsyncSessionLocal
+from database.config import engine
 
 class Manager:
     _instance = None

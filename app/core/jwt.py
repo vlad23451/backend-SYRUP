@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 
 from core.config import settings
 from core.logger import app_logger
 from exceptions.base import ValidationError
 from jose import jwt
-
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()

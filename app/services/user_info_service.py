@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable
+from typing import Dict
+from typing import Iterable
 
 from database.models.user import User
-from schemas.user import UserShortOut, UserShortOutWithFollowStatus
+from schemas.user import UserShortOut
+from schemas.user import UserShortOutWithFollowStatus
 from services.cache_service import UserCacheService
-from services.friend_service import (check_follow_status,
-                                     check_follow_status_many)
-
+from services.friend_service import check_follow_status
+from services.friend_service import check_follow_status_many
 
 async def build_user_info(me_user_id: int, user: User) -> UserShortOutWithFollowStatus:
     cached = await UserCacheService.get_user_info(user_id=user.id, me_user_id=me_user_id)

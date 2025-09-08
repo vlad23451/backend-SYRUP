@@ -143,8 +143,8 @@ python -m app.run
   - Временная метка: `created_at` (UTC)
 
 - Сообщения (`Message`):
-  - Поля: `id`, `sender_id`, `receiver_id`, `room_id` (indexed), `text`, `message_type` (Enum), `timestamp` (UTC, indexed), `is_read`, `message_metadata` (JSON)
-  - Связи: `sender`, `receiver`
+  - Поля: `id`, `sender_id`, `room_id` (indexed), `text`, `message_type` (Enum), `timestamp` (UTC, indexed), `is_read`, `message_metadata` (JSON)
+  - Связи: `sender`
 
 ### Связи и каскадирование
 - `relationship(..., cascade='all, delete')` на коллекциях моделей истории/комментариев/лайков удаляет зависимые записи вместе с родителем.
@@ -158,7 +158,7 @@ python -m app.run
 - Логическая непротиворечивость:
   - Подписки: `user_id != follower_id`
   - Дружба: `user_id < friend_id` (исключает дубликаты в обратном порядке)
-- Индексы на часто фильтруемые поля: `created_at`, `author_id`, `room_id`, `sender_id`, `receiver_id`, `role`.
+- Индексы на часто фильтруемые поля: `created_at`, `author_id`, `room_id`, `sender_id`, `role`.
 
 ### JSON и Enum поля
 - JSON: `comment_metadata`, `message_metadata` — для расширяемых атрибутов.
@@ -602,7 +602,7 @@ curl -X POST http://localhost:8000/auth/login \
   - `ChatCreate`: `room_id`
 - `schemas/message.py`:
   - Enum `MessageType`: `text`, `image`, `file`, `system`
-  - `MessageOut`: id, sender_id, receiver_id, room_id, text, message_type, timestamp, is_read, metadata{}, from_me
+  - `MessageOut`: id, sender_id, room_id, text, message_type, timestamp, is_read, metadata{}, from_me
   - `MessageCreate` и `MessageUpdate`: для создания/обновления
 
 ### Подписки/друзья/ответы

@@ -1,11 +1,6 @@
-"""Схемы для работы с токенами."""
-
 from pydantic import BaseModel
 
-
 class TokenResponse(BaseModel):
-    """Ответ с access токеном для WebSocket."""
-    
     access_token: str
     token_type: str = "bearer"
     expires_in: int

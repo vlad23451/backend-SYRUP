@@ -1,5 +1,5 @@
-from fastapi import HTTPException, status
-
+from fastapi import HTTPException
+from fastapi import status
 
 class CommentNotFoundError(HTTPException):
     def __init__(self, detail: str = "Комментарий не найден"):

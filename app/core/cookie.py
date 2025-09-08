@@ -1,6 +1,7 @@
-from api.auth_config import JWT_ACCESS_COOKIE_NAME, JWT_REFRESH_COOKIE_NAME
 from fastapi import Response
 
+from api.auth_config import JWT_ACCESS_COOKIE_NAME, JWT_REFRESH_COOKIE_NAME
+from api.auth_config import JWT_REFRESH_COOKIE_NAME
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
     max_age = 3600 * 24 * 7

@@ -8,26 +8,33 @@
 """
 import asyncio
 
-from api.dependencies.auth import get_current_user
-from api.dependencies.pagination import get_large_pagination
-from api.docs.followers import (follow_description, follower_create_responses,
-                                follower_delete_responses,
-                                follower_get_responses,
-                                get_followers_description,
-                                get_following_description,
-                                unfollow_description)
-
-from core.logger import app_logger
-from database.managers.followers_manager import FollowersManager
-from database.managers.friends_manager import FriendsManager
-from database.managers.user_manager import UserManager
-from database.models.user import User
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import status
+
+from api.dependencies.auth import get_current_user
+from api.dependencies.pagination import get_large_pagination
+
+from api.docs.followers import follow_description
+from api.docs.followers import follower_create_responses
+from api.docs.followers import follower_delete_responses
+from api.docs.followers import follower_get_responses
+from api.docs.followers import get_followers_description
+from api.docs.followers import get_following_description
+from api.docs.followers import unfollow_description
+
+from core.logger import app_logger
+
+from database.managers.followers_manager import FollowersManager
+from database.managers.friends_manager import FriendsManager
+from database.managers.user_manager import UserManager
+
+from database.models.user import User
+
 from schemas.followers import FollowerCreate
 from schemas.response import FollowResponse
 from schemas.user import UserShortOutWithFollowStatus
+
 from services.error_handler_service import handle_api_errors
 from services.user_info_service import build_user_info_many
 from services.friend_service import check_follow_status

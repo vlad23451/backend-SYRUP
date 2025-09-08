@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+
+from pydantic import BaseModel
+from pydantic import ValidationError
 
 from core.logger import app_logger
 from exceptions.base import ValidationError as AppValidationError
-from pydantic import BaseModel, ValidationError
-
 
 class ValidationService:
     @staticmethod
@@ -35,11 +38,11 @@ class ValidationService:
             raise AppValidationError(error_msg)
 
     @staticmethod
-    def validate_string_length(value: str, field_name: str, min_length: int = 0, max_length: Optional[int] = None) -> None:
+    def validate_string_length(value: str,
+                               field_name: str,
+                               min_length: int = 0,
+                               max_length: int | None = None) -> None:
         """Проверка длины строки"""
-        if not isinstance(value, str):
-            raise AppValidationError(f"Поле {field_name} должно быть строкой")
-        
         if len(value) < min_length:
             error_msg = f"Поле {field_name} должно содержать минимум {min_length} символов"
             app_logger.warning(f"Ошибка валидации длины: {error_msg}")
@@ -51,11 +54,11 @@ class ValidationService:
             raise AppValidationError(error_msg)
 
     @staticmethod
-    def validate_numeric_range(value: int, field_name: str, min_value: Optional[int] = None, max_value: Optional[int] = None) -> None:
+    def validate_numeric_range(value: int,
+                               field_name: str,
+                               min_value: int | None = None,
+                               max_value: int | None = None) -> None:
         """Проверка числового диапазона"""
-        if not isinstance(value, (int, float)):
-            raise AppValidationError(f"Поле {field_name} должно быть числом")
-        
         if min_value is not None and value < min_value:
             error_msg = f"Поле {field_name} должно быть не меньше {min_value}"
             app_logger.warning(f"Ошибка валидации диапазона: {error_msg}")
@@ -78,16 +81,4 @@ class ValidationService:
     @staticmethod
     def sanitize_string(value: str) -> str:
         """Очистка строки от потенциально опасных символов"""
-        if not isinstance(value, str):
-            return str(value)
         return value.strip()
-
-    @staticmethod
-    def validate_email_format(email: str) -> None:
-        """Проверка формата email"""
-        import re
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, email):
-            error_msg = "Неверный формат email адреса"
-            app_logger.warning(f"Ошибка валидации email: {error_msg}")
-            raise AppValidationError(error_msg)

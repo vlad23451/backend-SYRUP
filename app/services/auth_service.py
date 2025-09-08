@@ -1,9 +1,13 @@
-from core.jwt import create_access_token, create_refresh_token
+from core.jwt import create_access_token 
+from core.jwt import create_refresh_token
 from core.logger import app_logger
 from database.managers.user_manager import UserManager
-from schemas.user import UserAuth, UserCreate
+from schemas.user import UserAuth
+from schemas.user import UserCreate
 
 user_manager = UserManager()
+
+#TODO: Вынести создание токенов в отдельную фукнцию!
 
 async def register_user(new_user: UserCreate) -> tuple[str, str]:
     created_user = await user_manager.create_user(new_user)

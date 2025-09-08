@@ -4,7 +4,6 @@ from logging.handlers import RotatingFileHandler
 
 from colorlog import ColoredFormatter
 
-
 class StructuredFormatter(logging.Formatter):
     DEFAULT_FMT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 
@@ -50,7 +49,6 @@ class StructuredFormatter(logging.Formatter):
         if extras:
             return f"{base} | {' '.join(extras)}"
         return base
-
 
 class AppLogger:
     def __init__(self, name: str = "app", log_dir: str = "logs"):
@@ -100,7 +98,6 @@ class AppLogger:
     def get_logger(self):
         return self.logger
 
-    # Backward compatible pass-through
     def debug(self, msg, *args, **kwargs):
         self.logger.debug(msg, *args, **kwargs)
 
@@ -131,6 +128,5 @@ class AppLogger:
 
     def error_event(self, event: str, **context):
         self.event(logging.ERROR, event, **context)
-
 
 app_logger = AppLogger("app")

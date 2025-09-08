@@ -22,14 +22,13 @@ from __future__ import annotations
 import pickle
 
 from typing import Any
-from typing import Optional
 
 from core.logger import app_logger
 from core.config import settings
 
 from redis.asyncio import Redis
 
-_redis_client: Optional[Redis] = None
+_redis_client: Redis | None = None
 
 def get_redis_client() -> Redis:
     global _redis_client
@@ -44,11 +43,7 @@ class RedisCache:
     упростить логику работы с TTL и инвалидацией.
     """
     @staticmethod
-    async def get(key: str) -> Optional[Any]:
-        """Получить значение по ключу.
-
-        Возвращает None, если ключа нет или произошла ошибка десериализации.
-        """
+    async def get(key: str) -> Any | None:
         client = get_redis_client()
         raw = await client.get(key)
         if raw is None:
@@ -94,7 +89,7 @@ class UserCacheService:
     """
     
     @staticmethod
-    async def get_user_info(user_id: int, me_user_id: int) -> Optional[Any]:
+    async def get_user_info(user_id: int, me_user_id: int) -> Any | None:
         """Получить информацию о пользователе из кэша"""
         cache_key = f"user_info:{user_id}:{me_user_id}"
         return await RedisCache.get(cache_key)
@@ -114,13 +109,17 @@ class HistoryCacheService:
     """Специализированный кэш для историй с агрегированными счётчиками."""
     
     @staticmethod
-    async def get_history_with_counts(history_id: int, me_user_id: int) -> Optional[Any]:
+    async def get_history_with_counts(history_id: int,
+                                      me_user_id: int) -> Any | None:
         """Получить историю с подсчетами из кэша"""
         cache_key = f"history_with_counts:{history_id}:{me_user_id}"
         return await RedisCache.get(cache_key)
 
     @staticmethod
-    async def set_history_with_counts(history_id: int, me_user_id: int, history_data: Any, ttl: int = 300) -> None:
+    async def set_history_with_counts(history_id: int,
+                                      me_user_id: int,
+                                      history_data: Any,
+                                      ttl: int = 300) -> None:
         """Кэшировать историю с подсчетами"""
         cache_key = f"history_with_counts:{history_id}:{me_user_id}"
         await RedisCache.set(cache_key, history_data, ttl)
@@ -130,24 +129,23 @@ class HistoryCacheService:
         """Инвалидировать кэш истории"""
         await RedisCache.delete_by_prefix(f"history_with_counts:{history_id}:")
 
-
 class HistoryScoreCacheService:
     """Кэш для сохранённых значений score по историям."""
-
     @staticmethod
-    async def get_score(history_id: int) -> Optional[float]:
+    async def get_score(history_id: int) -> float | None:
         key = f"history_score:{history_id}"
         value = await RedisCache.get(key)
         if value is None:
             return None
         try:
-            # значение хранится как float или совместимый тип
             return float(value)
         except Exception:
             return None
 
     @staticmethod
-    async def set_score(history_id: int, score: float, ttl: int = 600) -> None:
+    async def set_score(history_id: int,
+                        score: float,
+                        ttl: int = 600) -> None:
         key = f"history_score:{history_id}"
         await RedisCache.set(key, float(score), ttl)
 
@@ -158,11 +156,17 @@ class HistoryScoreCacheService:
 class FollowersCacheService:
     """Кэш для списков подписчиков/подписок."""
     @staticmethod
-    async def get_followers(user_id: int, skip: int, limit: int):
+    async def get_followers(user_id: int,
+                            skip: int,
+                            limit: int):
         return await RedisCache.get(f"followers:{user_id}:{skip}:{limit}")
 
     @staticmethod
-    async def set_followers(user_id: int, skip: int, limit: int, data: Any, ttl: int = 120):
+    async def set_followers(user_id: int,
+                            skip: int,
+                            limit: int,
+                            data: Any,
+                            ttl: int = 120):
         await RedisCache.set(f"followers:{user_id}:{skip}:{limit}", data, ttl)
 
     @staticmethod
@@ -170,11 +174,17 @@ class FollowersCacheService:
         await RedisCache.delete_by_prefix(f"followers:{user_id}:")
 
     @staticmethod
-    async def get_following(user_id: int, skip: int, limit: int):
+    async def get_following(user_id: int,
+                            skip: int,
+                            limit: int):
         return await RedisCache.get(f"following:{user_id}:{skip}:{limit}")
 
     @staticmethod
-    async def set_following(user_id: int, skip: int, limit: int, data: Any, ttl: int = 120):
+    async def set_following(user_id: int,
+                            skip: int,
+                            limit: int,
+                            data: Any,
+                            ttl: int = 120):
         await RedisCache.set(f"following:{user_id}:{skip}:{limit}", data, ttl)
 
     @staticmethod
@@ -183,11 +193,17 @@ class FollowersCacheService:
 
 class FriendsCacheService:
     @staticmethod
-    async def get_friends(user_id: int, skip: int, limit: int):
+    async def get_friends(user_id: int,
+                          skip: int,
+                          limit: int):
         return await RedisCache.get(f"friends:{user_id}:{skip}:{limit}")
 
     @staticmethod
-    async def set_friends(user_id: int, skip: int, limit: int, data: Any, ttl: int = 120):
+    async def set_friends(user_id: int,
+                          skip: int,
+                          limit: int,
+                          data: Any,
+                          ttl: int = 120):
         await RedisCache.set(f"friends:{user_id}:{skip}:{limit}", data, ttl)
 
     @staticmethod
@@ -196,11 +212,19 @@ class FriendsCacheService:
 
 class HistoriesByAuthorCacheService:
     @staticmethod
-    async def get_histories(author_id: int, skip: int, limit: int, me_user_id: int):
+    async def get_histories(author_id: int,
+                            skip: int,
+                            limit: int,
+                            me_user_id: int):
         return await RedisCache.get(f"histories_by_author:{author_id}:{skip}:{limit}:{me_user_id}")
 
     @staticmethod
-    async def set_histories(author_id: int, skip: int, limit: int, me_user_id: int, data: Any, ttl: int = 120):
+    async def set_histories(author_id: int,
+                            skip: int,
+                            limit: int,
+                            me_user_id: int,
+                            data: Any,
+                            ttl: int = 120):
         await RedisCache.set(f"histories_by_author:{author_id}:{skip}:{limit}:{me_user_id}", data, ttl)
 
     @staticmethod
@@ -211,26 +235,41 @@ class HistoriesByAuthorCacheService:
 class FriendsHistoriesCacheService:
     """Кэш результирующих списков историй друзей пользователя."""
     @staticmethod
-    async def get_histories(user_id: int, skip: int, limit: int, me_user_id: int):
+    async def get_histories(user_id: int,
+                            skip: int,
+                            limit: int,
+                            me_user_id: int):
         return await RedisCache.get(f"friends_histories:{user_id}:{skip}:{limit}:{me_user_id}")
 
     @staticmethod
-    async def set_histories(user_id: int, skip: int, limit: int, me_user_id: int, data: Any, ttl: int = 120):
+    async def set_histories(user_id: int,
+                            skip: int,
+                            limit: int,
+                            me_user_id: int,
+                            data: Any,
+                            ttl: int = 120):
         await RedisCache.set(f"friends_histories:{user_id}:{skip}:{limit}:{me_user_id}", data, ttl)
 
     @staticmethod
     async def invalidate_histories(user_id: int):
         await RedisCache.delete_by_prefix(f"friends_histories:{user_id}:")
 
-
 class FollowingHistoriesCacheService:
     """Кэш результирующих списков историй подписок пользователя."""
     @staticmethod
-    async def get_histories(user_id: int, skip: int, limit: int, me_user_id: int):
+    async def get_histories(user_id: int,
+                            skip: int,
+                            limit: int,
+                            me_user_id: int):
         return await RedisCache.get(f"following_histories:{user_id}:{skip}:{limit}:{me_user_id}")
 
     @staticmethod
-    async def set_histories(user_id: int, skip: int, limit: int, me_user_id: int, data: Any, ttl: int = 120):
+    async def set_histories(user_id: int,
+                            skip: int,
+                            limit: int,
+                            me_user_id: int,
+                            data: Any,
+                            ttl: int = 120):
         await RedisCache.set(f"following_histories:{user_id}:{skip}:{limit}:{me_user_id}", data, ttl)
 
     @staticmethod
@@ -239,11 +278,19 @@ class FollowingHistoriesCacheService:
 
 class UsersSearchCacheService:
     @staticmethod
-    async def get_search(query: str, skip: int, limit: int, me_user_id: int):
+    async def get_search(query: str,
+                         skip: int,
+                         limit: int,
+                         me_user_id: int):
         return await RedisCache.get(f"users_search:{me_user_id}:{query}:{skip}:{limit}")
 
     @staticmethod
-    async def set_search(query: str, skip: int, limit: int, me_user_id: int, data: Any, ttl: int = 60):
+    async def set_search(query: str,
+                         skip: int,
+                         limit: int,
+                         me_user_id: int,
+                         data: Any,
+                         ttl: int = 60):
         await RedisCache.set(f"users_search:{me_user_id}:{query}:{skip}:{limit}", data, ttl)
 
     @staticmethod
@@ -252,11 +299,19 @@ class UsersSearchCacheService:
 
 class CommentsByHistoryCacheService:
     @staticmethod
-    async def get_comments(history_id: int, skip: int, limit: int, me_user_id: int):
+    async def get_comments(history_id: int,
+                           skip: int,
+                           limit: int,
+                           me_user_id: int):
         return await RedisCache.get(f"comments_by_history:{history_id}:{skip}:{limit}:{me_user_id}")
 
     @staticmethod
-    async def set_comments(history_id: int, skip: int, limit: int, me_user_id: int, data: Any, ttl: int = 60):
+    async def set_comments(history_id: int,
+                           skip: int,
+                           limit: int,
+                           me_user_id: int,
+                           data: Any,
+                           ttl: int = 60):
         await RedisCache.set(f"comments_by_history:{history_id}:{skip}:{limit}:{me_user_id}", data, ttl)
 
     @staticmethod

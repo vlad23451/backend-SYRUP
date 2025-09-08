@@ -1,6 +1,9 @@
 from enum import Enum
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
+from pydantic import field_validator
+from pydantic import ConfigDict
+
 from schemas.role import UserRole
 
 class FollowStatus(Enum):
@@ -31,8 +34,7 @@ class UserOut(UserBase):
         if hasattr(self, 'role') and not self.role_name:
             self.role_name = UserRole.get_role_name(self.role)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserShortOut(BaseModel):
     id: int
@@ -46,8 +48,7 @@ class UserShortOut(BaseModel):
             return v[:20] + "..."
         return v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserShortOutWithFollowStatus(UserShortOut):
     follow_status: FollowStatus

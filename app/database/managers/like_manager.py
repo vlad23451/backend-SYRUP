@@ -1,8 +1,14 @@
-from typing import Generic, Type, TypeVar
+from typing import Generic
+from typing import Type 
+from typing import TypeVar
 
-from database.models.comment_like import CommentDislike, CommentLike
-from database.models.history_like import HistoryDislike, HistoryLike
+from database.models.comment_like import CommentDislike
+from database.models.comment_like import CommentLike
+from database.models.history_like import HistoryDislike
+from database.models.history_like import HistoryLike
+
 from exceptions.base import DatabaseError
+
 from sqlalchemy import delete, select
 
 from .base_manager import BaseManager

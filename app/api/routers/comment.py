@@ -5,24 +5,33 @@
   комментария, счётчики лайков/дизлайков и списки пользователей реакций.
 - Инвалидация кэшей истории и комментариев выполняется при изменениях.
 """
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import Response
+from fastapi import status
+
 from api.dependencies.auth import get_current_user
 from api.dependencies.ownership import get_comment_or_error
-from api.docs.comment import (comment_create_responses,
-                              comment_delete_responses, comment_get_responses,
-                              comment_update_responses,
-                              create_comment_description,
-                              delete_comment_description,
-                              get_comment_description,
-                              update_comment_description)
+
+from api.docs.comment import comment_create_responses
+from api.docs.comment import comment_delete_responses
+from api.docs.comment import comment_get_responses
+from api.docs.comment import comment_update_responses
+from api.docs.comment import create_comment_description
+from api.docs.comment import delete_comment_description
+from api.docs.comment import get_comment_description
+from api.docs.comment import update_comment_description
+
 from core.logger import app_logger
+
 from database.managers.comment_manager import CommentManager
 from database.models.comments import Comment
 from database.models.user import User
-from exceptions.base import DatabaseError
-from exceptions.comment import CommentNotFoundError, OwnershipCommentError
-from fastapi import APIRouter, Depends, Response, status
-from schemas.comment import CommentCreate, CommentOut, CommentUpdate
-from schemas.user import UserShortOutWithFollowStatus
+
+from schemas.comment import CommentCreate
+from schemas.comment import CommentOut
+from schemas.comment import CommentUpdate
+
 from services.cache_invalidation_service import CacheInvalidationService
 from services.error_handler_service import handle_api_errors
 from services.reaction_service import ReactionService

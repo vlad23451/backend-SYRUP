@@ -1,7 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
 
-
 class UserRole(Enum):
     """Роли пользователей в системе"""
     USER = 1        # Обычный пользователь
@@ -32,13 +31,11 @@ class UserRole(Enum):
         """Проверить, имеет ли пользователь необходимые права"""
         return user_role >= required_role
 
-
 class RoleOut(BaseModel):
     """Схема вывода информации о роли"""
     id: int
     name: str
     description: str | None = None
-
 
 class RoleUpdate(BaseModel):
     """Схема для обновления роли пользователя"""

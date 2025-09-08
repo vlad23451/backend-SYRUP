@@ -3,21 +3,34 @@
 Конвертирует известные исключения домена в структурированные JSON-ответы,
 а остальные — в 500 с логированием через `app_logger`.
 """
-
-from core.logger import app_logger
-from exceptions.base import (DatabaseError, PermissionError,
-                             UnknownDatabaseError, ValidationError)
-from exceptions.comment import CommentNotFoundError, OwnershipCommentError
-from exceptions.histories import HistoryNotFoundError, OwnershipHistoryError
-from exceptions.like import LikeNotFoundError, OwnershipLikeError
-from exceptions.message import MessageNotFoundError, OwnershipMessageError
-from exceptions.users import (InvalidCredentialsError, InvalidUserDataError,
-                              UserAlreadyExistsError, UserNotFoundError)
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
+from core.logger import app_logger
+
+from exceptions.base import DatabaseError
+from exceptions.base import PermissionError
+from exceptions.base import UnknownDatabaseError
+from exceptions.base import ValidationError
+
+from exceptions.comment import CommentNotFoundError
+from exceptions.comment import OwnershipCommentError
+
+from exceptions.histories import HistoryNotFoundError
+from exceptions.histories import OwnershipHistoryError
+
+from exceptions.like import LikeNotFoundError
+from exceptions.like import OwnershipLikeError
+
+from exceptions.message import MessageNotFoundError
+from exceptions.message import OwnershipMessageError
+
+from exceptions.users import InvalidCredentialsError
+from exceptions.users import InvalidUserDataError
+from exceptions.users import UserAlreadyExistsError
+from exceptions.users import UserNotFoundError
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

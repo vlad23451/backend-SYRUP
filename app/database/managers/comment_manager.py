@@ -1,23 +1,34 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Dict, List
+from typing import Dict
+from typing import List
 
 from core.logger import app_logger
+
 from database.managers.base_manager import BaseManager
 from database.managers.history_manager import HistoryManager
 from database.managers.session_manager import Manager
 from database.managers.user_manager import UserManager
-from database.models.comment_like import CommentDislike, CommentLike
+
+from database.models.comment_like import CommentDislike
+from database.models.comment_like import CommentLike
 from database.models.comments import Comment
 from database.models.user import User
+
 from exceptions.histories import HistoryNotFoundError
+
 from schemas.comment import CommentOut, CommentUpdate
 from schemas.user import UserShortOutWithFollowStatus
+
 from services.cache_service import CommentsByHistoryCacheService
-from services.user_builders_service import build_user_list, build_users_map
-from services.user_info_service import build_user_info, build_user_info_many
-from sqlalchemy import func, select
+from services.user_builders_service import build_user_list
+from services.user_builders_service import build_users_map
+from services.user_info_service import build_user_info
+from services.user_info_service import build_user_info_many
+
+from sqlalchemy import func
+from sqlalchemy import select
 
 manager = Manager()
 user_manager = UserManager()

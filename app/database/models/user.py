@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from database.config import Base
 from database.models.followers import Follower
 from database.models.friends import Friend
+
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import DynamicMapped
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from .comments import Comment
     from .history_like import HistoryLike, HistoryDislike
     from .comment_like import CommentLike, CommentDislike
+    from .media_file import MediaFile
 
 class User(Base):
     __tablename__ = 'users'
@@ -63,5 +65,9 @@ class User(Base):
     
     received_friendships: Mapped[list["Friend"]] = relationship(
         'Friend', foreign_keys=[Friend.friend_id], back_populates='friend', cascade='all, delete-orphan'
+    )
+    
+    media_files: Mapped[list["MediaFile"]] = relationship(
+        'MediaFile', back_populates='user', cascade='all, delete-orphan'
     )
     

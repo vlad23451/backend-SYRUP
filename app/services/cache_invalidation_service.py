@@ -8,23 +8,22 @@
 
 from __future__ import annotations
 
-from services.cache_service import (
-    CommentsByHistoryCacheService,
-    FriendsHistoriesCacheService,
-    FriendsCacheService,
-    FollowersCacheService,
-    HistoryCacheService,
-    HistoriesByAuthorCacheService,
-    FollowingHistoriesCacheService,
-    UsersSearchCacheService,
-    UserCacheService,
-    HistoryScoreCacheService,
-)
-
+from services.cache_service import CommentsByHistoryCacheService
+from services.cache_service import FriendsHistoriesCacheService
+from services.cache_service import FriendsCacheService
+from services.cache_service import FollowersCacheService
+from services.cache_service import HistoryCacheService
+from services.cache_service import HistoriesByAuthorCacheService
+from services.cache_service import FollowingHistoriesCacheService
+from services.cache_service import UsersSearchCacheService
+from services.cache_service import UserCacheService
+from services.cache_service import HistoryScoreCacheService
 
 class CacheInvalidationService:
     @staticmethod
-    async def on_reaction_changed(history_id: int | None = None, comment_author_ids: list[int] | None = None, me_user_id: int | None = None):
+    async def on_reaction_changed(history_id: int | None = None,
+                                  comment_author_ids: list[int] | None = None,
+                                  me_user_id: int | None = None):
         """Инвалидация при изменении реакции (лайк/дизлайк).
 
         - История: counters могли измениться

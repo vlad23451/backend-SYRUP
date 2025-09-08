@@ -1,21 +1,14 @@
-from hashlib import md5
-
-from database.managers.user_manager import UserManager
+from database.managers.chat_manager import ChatManager
 from schemas.chat import ChatCreate
 
-user_manager = UserManager()
+async def create_or_get_private_chat(creator_id: int, companion_id: int) -> ChatCreate:
+    await ChatManager.create_or_get_private_chat(creator_id, companion_id)
+    return ChatCreate(
+        participants=[creator_id, companion_id],
+        chat_type='private',
+        title=None
+    )
 
-
-def build_room_id_for_users(user1_id: int, user2_id: int) -> str:
-    """Детерминированный room_id для пары пользователей.
-
-    Независим от порядка (user1,user2) → сортируем и хешируем.
-    """
-    a, b = sorted([int(user1_id), int(user2_id)])
-    return md5(f"{a}:{b}".encode()).hexdigest()
-
-
-async def create_room_id(creator_id: int, companion_login: str) -> ChatCreate:
-    companion_id = await user_manager.get_user_id_by_login(companion_login)
-    room_id = build_room_id_for_users(creator_id, companion_id)
-    return ChatCreate(room_id=room_id)
+async def get_chat_id_for_users(user1_id: int, user2_id: int) -> int:
+    chat = await ChatManager.create_or_get_private_chat(user1_id, user2_id)
+    return chat.id

@@ -1,17 +1,22 @@
 import bcrypt
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.future import select
+
 from core.logger import app_logger
+
 from database.managers.base_manager import BaseManager
 from database.managers.session_manager import manager
 from database.models.user import User
+
 from exceptions.base import DatabaseError
 from exceptions.users import InvalidCredentialsError
 from exceptions.users import UserAlreadyExistsError
 from exceptions.users import UserNotFoundError
+
 from schemas.user import UpdateUser
 from schemas.user import UserAuth
 from schemas.user import UserCreate
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.future import select
 
 class UserManager(BaseManager[User, UpdateUser]):
     def __init__(self) -> None:

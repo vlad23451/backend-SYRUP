@@ -14,7 +14,6 @@ from sqlalchemy.orm import relationship
 if TYPE_CHECKING:
     from .history import History
 
-
 class HistoryScore(Base):
     __tablename__ = 'history_scores'
 
@@ -39,5 +38,3 @@ class HistoryScore(Base):
     __table_args__ = (
         UniqueConstraint('history_id', name='uix_history_score_history_id'),
     )
-
-

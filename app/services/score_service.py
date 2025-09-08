@@ -4,6 +4,12 @@ import asyncio
 import sys
 import os
 
+from typing import List
+
+from sqlalchemy import desc
+from sqlalchemy import select
+from sqlalchemy import func
+
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
@@ -15,10 +21,6 @@ from database.models.history_like import HistoryLike
 from database.models.history_like import HistoryDislike
 from database.models.history_score import HistoryScore
 from database.models.comments import Comment
-from sqlalchemy import desc
-from sqlalchemy import select
-from sqlalchemy import func
-from typing import List
 
 from services.recomendations_service import compute_history_score
 from services.cache_service import HistoryScoreCacheService

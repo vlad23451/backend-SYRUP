@@ -1,8 +1,11 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import ConfigDict
 
 class MessageType(str, Enum):
     TEXT = "text"
@@ -13,21 +16,22 @@ class MessageType(str, Enum):
 class MessageOut(BaseModel):
     id: int
     sender_id: int
-    receiver_id: int
-    room_id: str
+    chat_id: int
     text: str
     message_type: MessageType = MessageType.TEXT
     timestamp: datetime
     is_read: bool = False
     metadata: Dict[str, Any] = Field(default_factory=dict)
     from_me: bool
+    edited_at: datetime | None = None
+    is_deleted: bool = False
+    is_pinned: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MessageCreate(BaseModel):
     text: str
-    receiver_id: int
+    chat_id: int
     message_type: MessageType = MessageType.TEXT
     metadata: Dict[str, Any] | None = None
 
@@ -36,5 +40,12 @@ class MessageUpdate(BaseModel):
     is_read: bool | None = None
     metadata: Dict[str, Any] | None = None
 
-    class Config:
-        from_attributes = True
+class MessageEditPayload(BaseModel):
+    text: str
+
+class MessagePinPayload(BaseModel):
+    is_pinned: bool
+    is_read: bool | None = None
+    metadata: Dict[str, Any] | None = None
+
+    model_config = ConfigDict(from_attributes=True)

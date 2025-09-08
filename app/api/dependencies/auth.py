@@ -4,15 +4,22 @@
 из cookie и проверки refresh-токена. Все ошибки переводятся в доменные
 исключения для единообразной обработки middleware/декоратором.
 """
-from api.auth_config import JWT_ACCESS_COOKIE_NAME, JWT_REFRESH_COOKIE_NAME
-from core.jwt import decode_token
-from core.logger import app_logger
-from database.managers.user_manager import UserManager
-from database.models.user import User
-from exceptions.base import PermissionError, ValidationError
-from exceptions.users import UserNotFoundError
 from fastapi import Request
 from jose import JWTError
+
+from api.auth_config import JWT_ACCESS_COOKIE_NAME
+from api.auth_config import JWT_REFRESH_COOKIE_NAME
+
+from core.jwt import decode_token
+from core.logger import app_logger
+
+from database.managers.user_manager import UserManager
+from database.models.user import User
+
+from exceptions.base import PermissionError
+from exceptions.base import ValidationError
+
+from exceptions.users import UserNotFoundError
 
 user_manager = UserManager()
 

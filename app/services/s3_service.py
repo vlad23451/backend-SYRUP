@@ -1,37 +1,17 @@
-"""Сервис для работы с S3 хранилищем (Selectel, совместимым с AWS S3 API).
-
-Примеры использования:
-
-    # Загрузка файла
-    s3_service = S3Service()
-    with open('avatar.jpg', 'rb') as f:
-        file_data = f.read()
-    
-    object_key = await s3_service.upload_file(
-        file=file_data,
-        filename='avatar.jpg', 
-        folder='avatars'
-    )
-    # Возвращает: "avatars/cbff3388-5c25-45c4-b6ca-9fa4f372aca1.jpg"
-    
-    # Генерация временной ссылки
-    url = await s3_service.generate_presigned_url(object_key)
-    # Возвращает: "https://s3.ru-7.storage.selcloud.ru/test-backet-syrup/avatars/..."
-    
-    # Удаление файла
-    await s3_service.delete_file(object_key)
-"""
-
 import uuid
-from typing import Optional
-
 import boto3
+
 from botocore.config import Config
-from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
+from botocore.exceptions import ClientError
+from botocore.exceptions import NoCredentialsError
+from botocore.exceptions import EndpointConnectionError
+
 from core.config import settings
 from core.logger import app_logger
-from exceptions.s3 import S3ObjectNotFoundError, S3ServiceUnavailableError, S3UploadError
 
+from exceptions.s3 import S3ObjectNotFoundError
+from exceptions.s3 import S3ServiceUnavailableError
+from exceptions.s3 import S3UploadError
 
 class S3Service:
     """Сервис для работы с S3 хранилищем.
@@ -45,7 +25,6 @@ class S3Service:
     def __init__(self):
         """Инициализация S3 клиента."""
         try:
-            # Конфигурация для отключения прокси и улучшения соединения
             config = Config(
                 proxies={},  # Принудительно отключаем все прокси
                 retries={
@@ -56,6 +35,13 @@ class S3Service:
                 signature_version='s3v4'
             )
 
+            # Настройка verify: путь к CA-бандлу приоритетнее, затем bool-флаг
+            verify_option = True
+            if getattr(settings, "s3_ca_bundle_path", None):
+                verify_option = settings.s3_ca_bundle_path
+            else:
+                verify_option = bool(getattr(settings, "s3_verify_ssl", True))
+
             self.s3_client = boto3.client(
                 's3',
                 endpoint_url=settings.s3_endpoint_url,
@@ -63,7 +49,7 @@ class S3Service:
                 aws_secret_access_key=settings.s3_secret_access_key,
                 region_name=settings.s3_region,
                 use_ssl=settings.s3_use_ssl,
-                verify=False,
+                verify=verify_option,
                 config=config
             )
 
@@ -185,7 +171,7 @@ class S3Service:
             app_logger.error(f"Unexpected error during presigned URL generation: {e}")
             raise S3ServiceUnavailableError("Неожиданная ошибка при генерации ссылки")
 
-    async def delete_file(self, object_key: str) -> Optional[bool]:
+    async def delete_file(self, object_key: str) -> bool | None:
         """Удаляет файл из S3.
         
         Args:
