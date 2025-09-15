@@ -9,13 +9,17 @@ from schemas.user import UserShortOutWithFollowStatus
 from services.cache_service import UserCacheService
 from services.friend_service import check_follow_status
 from services.friend_service import check_follow_status_many
+from services.avatar_service import avatar_service
 
 async def build_user_info(me_user_id: int, user: User) -> UserShortOutWithFollowStatus:
     cached = await UserCacheService.get_user_info(user_id=user.id, me_user_id=me_user_id)
     if cached is not None:
         return cached
 
-    data = UserShortOut.model_validate(user).model_dump()
+    # Создаем UserShortOut с правильным avatar_url
+    user_short = await UserShortOut.from_user(user, avatar_service)
+    data = user_short.model_dump()
+    
     follow_status = await check_follow_status(user_id=user.id, follower_id=me_user_id)
     data["follow_status"] = follow_status
     result = UserShortOutWithFollowStatus.model_validate(data)
@@ -33,7 +37,10 @@ async def build_user_info_many(me_user_id: int, users: Iterable[User]) -> Dict[i
         if cached is not None:
             result[user.id] = cached
             continue
-        data = UserShortOut.model_validate(user).model_dump()
+        # Создаем UserShortOut с правильным avatar_url
+        user_short = await UserShortOut.from_user(user, avatar_service)
+        data = user_short.model_dump()
+        
         data["follow_status"] = statuses.get(user.id)
         validated = UserShortOutWithFollowStatus.model_validate(data)
         await UserCacheService.set_user_info(user_id=user.id, me_user_id=me_user_id, user_info=validated)

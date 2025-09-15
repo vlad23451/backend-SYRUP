@@ -2,12 +2,14 @@ import bcrypt
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload
 
 from core.logger import app_logger
 
 from database.managers.base_manager import BaseManager
 from database.managers.session_manager import manager
 from database.models.user import User
+from database.models.followers import Follower
 
 from exceptions.base import DatabaseError
 from exceptions.users import InvalidCredentialsError
@@ -29,6 +31,68 @@ class UserManager(BaseManager[User, UpdateUser]):
             user = result.scalars().first()
             if user is None:
                 raise UserNotFoundError()
+            return user
+
+    @staticmethod
+    async def get_user_by_login_with_relations(login: str) -> User:
+        """Получить пользователя по логину с загрузкой всех отношений"""
+        async with manager.get_async_session() as session:
+            result = await session.execute(
+                select(User)
+                .where(User.login == login)
+                .options(
+                    joinedload(User.initiated_friendships),
+                    joinedload(User.received_friendships)
+                )
+            )
+            user = result.scalars().first()
+            if user is None:
+                raise UserNotFoundError()
+            
+            # Загружаем DynamicMapped отношения отдельно
+            # followers - кто подписан на этого пользователя
+            followers_result = await session.execute(
+                select(Follower.follower_id).where(Follower.user_id == user.id)
+            )
+            user._followers_ids = [row[0] for row in followers_result.fetchall()]
+            
+            # following - на кого подписан этот пользователь
+            following_result = await session.execute(
+                select(Follower.user_id).where(Follower.follower_id == user.id)
+            )
+            user._following_ids = [row[0] for row in following_result.fetchall()]
+            
+            return user
+
+    @staticmethod
+    async def get_user_by_id_with_relations(user_id: int) -> User:
+        """Получить пользователя по ID с загрузкой всех отношений"""
+        async with manager.get_async_session() as session:
+            result = await session.execute(
+                select(User)
+                .where(User.id == user_id)
+                .options(
+                    joinedload(User.initiated_friendships),
+                    joinedload(User.received_friendships)
+                )
+            )
+            user = result.scalars().first()
+            if user is None:
+                raise UserNotFoundError()
+            
+            # Загружаем DynamicMapped отношения отдельно
+            # followers - кто подписан на этого пользователя
+            followers_result = await session.execute(
+                select(Follower.follower_id).where(Follower.user_id == user.id)
+            )
+            user._followers_ids = [row[0] for row in followers_result.fetchall()]
+            
+            # following - на кого подписан этот пользователь
+            following_result = await session.execute(
+                select(Follower.user_id).where(Follower.follower_id == user.id)
+            )
+            user._following_ids = [row[0] for row in following_result.fetchall()]
+            
             return user
 
     @staticmethod
@@ -67,6 +131,36 @@ class UserManager(BaseManager[User, UpdateUser]):
                 .limit(limit)
             )
             return result.scalars().all()
+
+    @staticmethod
+    async def get_users_by_role_with_relations(role_id: int):
+        """Получить пользователей по роли с загрузкой отношений"""
+        async with manager.get_async_session() as session:
+            result = await session.execute(
+                select(User)
+                .where(User.role == role_id)
+                .options(
+                    joinedload(User.initiated_friendships),
+                    joinedload(User.received_friendships)
+                )
+            )
+            users = result.scalars().all()
+            
+            # Загружаем DynamicMapped отношения для каждого пользователя
+            for user in users:
+                # followers - кто подписан на этого пользователя
+                followers_result = await session.execute(
+                    select(Follower.follower_id).where(Follower.user_id == user.id)
+                )
+                user._followers_ids = [row[0] for row in followers_result.fetchall()]
+                
+                # following - на кого подписан этот пользователь
+                following_result = await session.execute(
+                    select(Follower.user_id).where(Follower.follower_id == user.id)
+                )
+                user._following_ids = [row[0] for row in following_result.fetchall()]
+            
+            return users
 
     @staticmethod
     async def check_user_data(user: UserAuth) -> User:
@@ -174,3 +268,4 @@ class UserManager(BaseManager[User, UpdateUser]):
         except Exception as e:
             app_logger.exception(f"Ошибка при обновлении аватара пользователя {user_id}: {e}")
             raise DatabaseError(f"Ошибка при обновлении аватара пользователя")
+

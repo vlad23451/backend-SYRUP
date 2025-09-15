@@ -62,6 +62,18 @@ class AvatarService:
         app_logger.info(f"Avatar uploaded for user {current_user.id}: {object_key}")
         return object_key, presigned_url
     
+    async def get_avatar_url_or_none(self, user: User) -> str | None:
+        """Получить URL аватара пользователя или None, если аватара нет"""
+        if not user.avatar_key:
+            return None
+        
+        try:
+            presigned_url = await self.s3_service.generate_presigned_url(user.avatar_key)
+            return presigned_url
+        except Exception as e:
+            app_logger.warning(f"Failed to generate avatar URL for user {user.id}: {e}")
+            return None
+
     async def _delete_old_avatar(self, old_avatar_key: Optional[str]) -> None:
         if not old_avatar_key:
             return

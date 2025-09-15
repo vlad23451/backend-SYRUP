@@ -13,6 +13,7 @@ class FileOut(BaseModel):
     folder: str
     description: str | None = None
     is_public: bool = False
+    download_url: str | None = None
     created_at: datetime
     updated_at: datetime
 

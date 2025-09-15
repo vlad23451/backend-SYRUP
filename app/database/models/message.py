@@ -42,10 +42,10 @@ class Message(Base):
 
     message_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
 
-    # Новые поля для операций
-    #edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    #is_deleted: Mapped[bool] = mapped_column(default=False, nullable=False)
-    #is_pinned: Mapped[bool] = mapped_column(default=False, nullable=False)
+    # Поля для операций редактирования и удаления
+    edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_pinned: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     sender: Mapped["User"] = relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     chat: Mapped["Chat"] = relationship('Chat', back_populates='messages')

@@ -1,5 +1,4 @@
 import os
-import shutil
 from pathlib import Path
 from typing import Optional, Tuple
 from fastapi import UploadFile, HTTPException, status
@@ -56,10 +55,7 @@ class FileService:
             )
 
         # Обрабатываем метаданные для медиафайлов
-        width, height, duration = None, None, None
-        
-        if file_type in [FileType.IMAGE, FileType.VIDEO]:
-            width, height = await self._extract_media_dimensions(file_path, file_type)
+        duration = None
         
         if file_type in [FileType.AUDIO, FileType.VIDEO]:
             duration = await self._extract_media_duration(file_path, file_type)
@@ -72,8 +68,6 @@ class FileService:
             "file_size": file_size,
             "mime_type": file.content_type,
             "file_type": file_type.value,
-            "width": width,
-            "height": height,
             "duration": duration,
             "history_id": history_id
         }
@@ -84,19 +78,6 @@ class FileService:
         
         return file_record
 
-    async def _extract_media_dimensions(self, file_path: str, file_type: FileType) -> Tuple[Optional[int], Optional[int]]:
-        """Извлекает размеры изображения или видео."""
-        try:
-            if file_type == FileType.IMAGE:
-                with Image.open(file_path) as img:
-                    return img.width, img.height
-            elif file_type == FileType.VIDEO:
-                # Для видео можно использовать ffmpeg или другие библиотеки
-                # Пока возвращаем None, None
-                return None, None
-        except Exception as e:
-            app_logger.warning(f"Не удалось извлечь размеры для {file_path}: {e}")
-            return None, None
 
     async def _extract_media_duration(self, file_path: str, file_type: FileType) -> Optional[float]:
         """Извлекает длительность аудио или видео файла."""

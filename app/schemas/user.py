@@ -16,7 +16,7 @@ class FollowStatus(Enum):
 class UserBase(BaseModel):
     login: str
     about: str | None = None
-    avatar_key: str | None = None
+    avatar_url: str | None = None
 
 class UserCreate(UserBase):
     password: str
@@ -34,13 +34,56 @@ class UserOut(UserBase):
         if hasattr(self, 'role') and not self.role_name:
             self.role_name = UserRole.get_role_name(self.role)
 
-    model_config = ConfigDict(from_attributes=True)
+    @staticmethod
+    async def from_user_with_relations(user, avatar_service=None) -> "UserOut":
+        """Создает UserOut из объекта User с загрузкой аватара и отношений"""
+        avatar_url = None
+        if hasattr(user, 'avatar_key') and user.avatar_key and avatar_service:
+            avatar_url = await avatar_service.get_avatar_url_or_none(user)
+        
+        # Загружаем списки друзей, подписчиков и подписок
+        friends = []
+        followers = []
+        following = []
+        
+        # Друзья - объединяем initiated_friendships и received_friendships
+        if hasattr(user, 'initiated_friendships') and user.initiated_friendships:
+            friends.extend([friend.friend_id for friend in user.initiated_friendships])
+        if hasattr(user, 'received_friendships') and user.received_friendships:
+            friends.extend([friendship.user_id for friendship in user.received_friendships])
+        
+        # Подписчики - используем предзагруженные ID
+        if hasattr(user, '_followers_ids'):
+            followers = user._followers_ids
+        else:
+            followers = []
+        
+        # Подписки - используем предзагруженные ID
+        if hasattr(user, '_following_ids'):
+            following = user._following_ids
+        else:
+            following = []
+        
+        data = {
+            "id": user.id,
+            "login": user.login,
+            "about": user.about,
+            "avatar_url": avatar_url,
+            "role": user.role,
+            "role_name": UserRole.get_role_name(user.role),
+            "friends": friends,
+            "followers": followers,
+            "following": following
+        }
+        return UserOut(**data)
+
+    model_config = ConfigDict(from_attributes=True, exclude={'avatar_key'})
 
 class UserShortOut(BaseModel):
     id: int
     login: str
     about: str | None = None
-    avatar_key: str | None = None
+    avatar_url: str | None = None
     
     @field_validator("about", mode="before")
     def validate_about(v):
@@ -48,7 +91,22 @@ class UserShortOut(BaseModel):
             return v[:20] + "..."
         return v
 
-    model_config = ConfigDict(from_attributes=True)
+    @staticmethod
+    async def from_user(user, avatar_service=None) -> "UserShortOut":
+        """Создает UserShortOut из объекта User с правильным avatar_url"""
+        avatar_url = None
+        if hasattr(user, 'avatar_key') and user.avatar_key and avatar_service:
+            avatar_url = await avatar_service.get_avatar_url_or_none(user)
+        
+        data = {
+            "id": user.id,
+            "login": user.login,
+            "about": user.about,
+            "avatar_url": avatar_url
+        }
+        return UserShortOut(**data)
+
+    model_config = ConfigDict(from_attributes=True, exclude={'avatar_key'})
 
 class UserShortOutWithFollowStatus(UserShortOut):
     follow_status: FollowStatus

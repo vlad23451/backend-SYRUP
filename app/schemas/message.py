@@ -27,7 +27,7 @@ class MessageOut(BaseModel):
     is_deleted: bool = False
     is_pinned: bool = False
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, exclude={'avatar_key'})
 
 class MessageCreate(BaseModel):
     text: str
@@ -40,12 +40,8 @@ class MessageUpdate(BaseModel):
     is_read: bool | None = None
     metadata: Dict[str, Any] | None = None
 
-class MessageEditPayload(BaseModel):
-    text: str
+class ChatHistoryResponse(BaseModel):
+    """Ответ с историей чата и аватарами участников"""
+    companion_avatar_url: str | None = None
+    messages: list[MessageOut]
 
-class MessagePinPayload(BaseModel):
-    is_pinned: bool
-    is_read: bool | None = None
-    metadata: Dict[str, Any] | None = None
-
-    model_config = ConfigDict(from_attributes=True)

@@ -41,6 +41,7 @@ from exceptions.histories import HistoryNotFoundError
 
 from schemas.comment import CommentOut
 from schemas.history import HistoryCreate, HistoryOut, HistoryUpdate
+from schemas.history import HistoryIdsIn
 
 from services.cache_invalidation_service import CacheInvalidationService
 from services.error_handler_service import handle_api_errors
@@ -80,6 +81,19 @@ async def get_histories(user: User = Depends(get_current_user),
                         pagination: tuple[int, int] = Depends(get_small_pagination)) -> Sequence[HistoryOut]:
     skip, limit = pagination
     return await history_manager.get_histories(skip, limit, me_user_id=user.id)
+
+@history_router.post('/by-ids',
+                    summary='Получить истории по списку ID',
+                    status_code=status.HTTP_200_OK)
+@handle_api_errors("Ошибка при получении историй по списку ID")
+async def get_histories_by_ids(payload: HistoryIdsIn,
+                               user: User = Depends(get_current_user)) -> Sequence[HistoryOut]:
+    ids = list(dict.fromkeys([i for i in (payload.ids or []) if isinstance(i, int)]))
+    if not ids:
+        return []
+    items = await history_manager.get_histories_by_ids(ids=ids, me_user_id=user.id)
+    app_logger.info_event("histories_by_ids_fetched", user_id=user.id, count=len(ids))
+    return items
 
 @history_router.get('/id/{id}',
                     summary='Получить историю по ID',

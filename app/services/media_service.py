@@ -72,6 +72,9 @@ class MediaService:
         
         return 'document'
     
+    
+    
+    
     def _validate_file(self, file: UploadFile, file_type: str) -> None:
         """Проверяет файл на соответствие требованиям."""
         if file_type not in self.file_type_config:
@@ -114,7 +117,7 @@ class MediaService:
             if file_size > max_size_bytes:
                 raise MediaFileSizeExceededError(f"Файл слишком большой. Максимальный размер: {config['max_size_mb']}MB")
             
-            # Загружаем в S3
+            # Загружаем файл в S3
             file_key = await self.s3_service.upload_file(
                 file=file_content,
                 filename=file.filename,
@@ -347,6 +350,8 @@ class MediaService:
                     'mime_type': media_file.mime_type,
                     'file_size': media_file.file_size,
                     'folder': media_file.folder,
+                    'width': media_file.width,
+                    'height': media_file.height,
                     'user_id': media_file.user_id,
                     'history_id': media_file.history_id,
                     'description': media_file.description,

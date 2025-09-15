@@ -23,7 +23,6 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str) 
 
 
 def clear_auth_cookies(response: Response) -> None:
-    # Удаляем cookies с теми же настройками что и при установке
     response.delete_cookie(JWT_ACCESS_COOKIE_NAME, 
                           secure=True,
                           samesite='none')

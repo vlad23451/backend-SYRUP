@@ -20,6 +20,7 @@ class ChatPreview(BaseModel):
     chat_id: int
     companion_id: int | None = None  # Для приватных чатов
     companion_login: str | None = None  # Для приватных чатов
+    companion_avatar_url: str | None = None  # URL аватара собеседника
     title: str | None = None  # Для групповых чатов
     last_message: str
     last_message_time: datetime

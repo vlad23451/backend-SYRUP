@@ -7,8 +7,9 @@ from fastapi import WebSocket
 from core.logger import app_logger
 from database.managers.connection_singleton import get_connection_manager
 from database.managers.message_manager import MessageManager
+from database.managers.user_manager import UserManager
 from services.chat_service import get_chat_id_for_users
-from services.message_service import send_message_to_chat
+from services.message_service import send_message_to_chat, edit_message, delete_message, set_pinned
 
 
 class WebSocketEventHandler:
@@ -17,6 +18,7 @@ class WebSocketEventHandler:
     def __init__(self):
         self.connection_manager = get_connection_manager()
         self.message_manager = MessageManager()
+        self.user_manager = UserManager()
     
     async def handle_join_chat(self, websocket: WebSocket, data: Dict[str, Any]) -> None:
         """Обработка события подключения к чату"""
@@ -101,10 +103,15 @@ class WebSocketEventHandler:
             app_logger.info(f"Отправка сообщения в чат {chat_id} от пользователя {sender_id}")
             app_logger.info(f"Участники чата {chat_id} получат сообщение: {chat_participants}")
             
+            # Получаем логин отправителя
+            sender_user = await self.user_manager.get_obj_by_id(sender_id)
+            sender_login = sender_user.login
+            
             msg = {
                 "sender_id": sender_id,
                 "chat_id": chat_id,
                 "text": str(data["text"]),
+                "sender_login": sender_login,
             }
             
             sent = await send_message_to_chat(msg)
@@ -163,6 +170,137 @@ class WebSocketEventHandler:
             "until_timestamp": until_ts,
         })
 
+    async def handle_edit_message(self, websocket: WebSocket, data: Dict[str, Any]) -> None:
+        """Обработка события редактирования сообщения"""
+        request_id = data.get("request_id")
+        
+        try:
+            message_id = int(data["message_id"])
+            new_text = str(data["text"])
+            
+            current_user_id = self.connection_manager.get_user_id(websocket)
+            if current_user_id is None:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": "edit_message: user not authenticated", 
+                    "request_id": request_id
+                })
+                return
+            
+            # Получаем сообщение для определения chat_id
+            message = await self.message_manager.get_obj_by_id(message_id)
+            if not message:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": "edit_message: message not found", 
+                    "request_id": request_id
+                })
+                return
+            
+            # Используем сервис с WebSocket уведомлениями
+            result = await edit_message(message_id, current_user_id, new_text)
+            
+            await websocket.send_json({
+                "type": "ack", 
+                "request_id": request_id, 
+                "message": result
+            })
+            
+        except Exception as e:
+            app_logger.error(f"Ошибка редактирования сообщения через WebSocket: {e}")
+            await websocket.send_json({
+                "type": "error", 
+                "message": "edit_message: invalid payload", 
+                "request_id": request_id
+            })
+
+    async def handle_delete_message(self, websocket: WebSocket, data: Dict[str, Any]) -> None:
+        """Обработка события удаления сообщения"""
+        request_id = data.get("request_id")
+        
+        try:
+            message_id = int(data["message_id"])
+            
+            current_user_id = self.connection_manager.get_user_id(websocket)
+            if current_user_id is None:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": "delete_message: user not authenticated", 
+                    "request_id": request_id
+                })
+                return
+            
+            # Получаем сообщение для определения chat_id
+            message = await self.message_manager.get_obj_by_id(message_id)
+            if not message:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": "delete_message: message not found", 
+                    "request_id": request_id
+                })
+                return
+            
+            # Используем сервис с WebSocket уведомлениями
+            result = await delete_message(message_id, current_user_id, message.chat_id)
+            
+            await websocket.send_json({
+                "type": "ack", 
+                "request_id": request_id, 
+                "message": result
+            })
+            
+        except Exception as e:
+            app_logger.error(f"Ошибка удаления сообщения через WebSocket: {e}")
+            await websocket.send_json({
+                "type": "error", 
+                "message": "delete_message: invalid payload", 
+                "request_id": request_id
+            })
+
+    async def handle_pin_message(self, websocket: WebSocket, data: Dict[str, Any]) -> None:
+        """Обработка события закрепления сообщения"""
+        request_id = data.get("request_id")
+        
+        try:
+            message_id = int(data["message_id"])
+            is_pinned = bool(data["is_pinned"])
+            
+            current_user_id = self.connection_manager.get_user_id(websocket)
+            if current_user_id is None:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": "pin_message: user not authenticated", 
+                    "request_id": request_id
+                })
+                return
+            
+            # Получаем сообщение для определения chat_id
+            message = await self.message_manager.get_obj_by_id(message_id)
+            if not message:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": "pin_message: message not found", 
+                    "request_id": request_id
+                })
+                return
+            
+            # Используем сервис с WebSocket уведомлениями
+            result = await set_pinned(message_id, current_user_id, is_pinned, message.chat_id)
+            
+            await websocket.send_json({
+                "type": "ack", 
+                "request_id": request_id, 
+                "message": result
+            })
+            
+        except Exception as e:
+            app_logger.error(f"Ошибка закрепления сообщения через WebSocket: {e}")
+            await websocket.send_json({
+                "type": "error", 
+                "message": "pin_message: invalid payload", 
+                "request_id": request_id
+            })
+
     async def handle_unknown_event(self, websocket: WebSocket, event_type: str) -> None:
         """Обработка неизвестного типа события"""
         app_logger.warning(f"Получен неизвестный тип события: {event_type}")
@@ -183,6 +321,9 @@ class WebSocketEventHandler:
             "send_message": self.handle_send_message,
             "typing": self.handle_typing,
             "mark_as_read": self.handle_mark_as_read,
+            "edit_message": self.handle_edit_message,
+            "delete_message": self.handle_delete_message,
+            "pin_message": self.handle_pin_message,
         }
 
         if event_type in event_handlers:

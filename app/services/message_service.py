@@ -1,12 +1,17 @@
 from database.managers.connection_singleton import get_connection_manager
 from database.managers.message_manager import MessageManager
 from database.managers.chat_manager import ChatManager
+from database.managers.user_manager import UserManager
+
 from services.validation_service import ValidationService as VS
+
 from utils.json_utils import prepare_for_websocket
+
 from core.logger import app_logger
 
 message_manager = MessageManager()
 connection_manager = get_connection_manager()
+user_manager = UserManager()
 
 async def send_message_to_chat(message_data: dict,
                                from_me: bool = True) -> dict:
@@ -22,15 +27,22 @@ async def send_message_to_chat(message_data: dict,
     if not await ChatManager.is_participant(chat_id, sender_id):
         raise ValueError(f"User {sender_id} is not a participant of chat {chat_id}")
     
-    message_data = {
-        **message_data, 
+    # Извлекаем sender_login или получаем из БД
+    sender_login = message_data.get("sender_login")
+    if not sender_login:
+        # Если логин не передан, получаем его из базы данных
+        sender_user = await user_manager.get_obj_by_id(sender_id)
+        sender_login = sender_user.login
+    
+    # Подготавливаем данные для сохранения (без sender_login)
+    db_message_data = {
         "sender_id": sender_id,
         "chat_id": chat_id,
         "text": VS.sanitize_string(message_data["text"])
     }
 
     # Сохраняем в БД
-    saved = await message_manager.save_message(message_data)
+    saved = await message_manager.save_message(db_message_data)
 
     # Обновляем время последней активности чата
     await ChatManager.update_chat_activity(chat_id)
@@ -42,6 +54,9 @@ async def send_message_to_chat(message_data: dict,
     websocket_message = prepare_for_websocket(message_dict)
     websocket_message["type"] = "new_message"  # Добавляем тип события
     
+    # Добавляем логин отправителя (всегда есть)
+    websocket_message["sender_login"] = sender_login
+    
     # Отправляем всем участникам чата, подключенным к WebSocket
     await connection_manager.send_private_message(str(chat_id), websocket_message)
     
@@ -50,7 +65,10 @@ async def send_message_to_chat(message_data: dict,
     app_logger.info(f"Сообщение разослано участникам чата {chat_id}: {message_dict.get('text', '')[:50]}...")
     app_logger.info(f"Участники чата {chat_id} подключенные к WebSocket после отправки: {chat_participants_ws}")
 
-    return {**message_dict, "from_me": from_me}
+    # Добавляем sender_login в ответ API
+    result = {**message_dict, "from_me": from_me, "sender_login": sender_login}
+    
+    return result
 
 
 async def edit_message(message_id: int, editor_user_id: int, new_text: str) -> dict:

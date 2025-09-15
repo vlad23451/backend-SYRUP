@@ -16,6 +16,8 @@ from fastapi.responses import JSONResponse
 
 from api.dependencies.auth import get_current_user
 from api.dependencies.auth import validate_refresh_token
+from schemas.user import UserOut
+from services.avatar_service import avatar_service
 
 from api.docs.auth import auth_login_responses
 from api.docs.auth import auth_register_responses
@@ -39,6 +41,7 @@ from database.models.user import User
 
 from schemas.user import UserAuth
 from schemas.user import UserCreate
+from schemas.user import UserOut
 from schemas.token import TokenResponse
 
 from database.managers.user_manager import UserManager
@@ -59,7 +62,14 @@ user_manager = UserManager()
 async def create_user(new_user: UserCreate) -> JSONResponse:
     """Создать пользователя. И выдать токены"""
     access_token, refresh_token = await register_user(new_user)
-    response = JSONResponse(content={"message": "Пользователь успешно создан"})
+    db_user = await user_manager.get_user_by_login(new_user.login)
+    user_info = UserOut.model_validate(db_user)
+    
+    response = JSONResponse(
+        content={
+            "user_info": user_info.model_dump(),
+        }
+    )
     set_auth_cookies(response, access_token, refresh_token)
     app_logger.info(f"Пользователь {new_user.login} успешно создан")
     return response
@@ -73,11 +83,12 @@ async def create_user(new_user: UserCreate) -> JSONResponse:
 async def login(user: UserAuth) -> JSONResponse:
     """Войти в аккаунт. И выдать токены"""
     access_token, refresh_token = await login_user(user)
-    user_id = await user_manager.get_user_id_by_login(user.login)   
+    db_user = await user_manager.get_user_by_login_with_relations(user.login)
+    user_info = await UserOut.from_user_with_relations(db_user, avatar_service)
+    
     response = JSONResponse(
         content={
-            "message": "Вы успешно вошли в аккаунт",
-            "user_id": user_id,
+            "user_info": user_info.model_dump(),
         }
     )
     set_auth_cookies(response, access_token, refresh_token)

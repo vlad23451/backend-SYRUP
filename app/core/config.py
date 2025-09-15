@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     port: int = 8000
         
     redis_url: str = "redis://localhost:6379/0"
+    redis_enabled: bool = True  # Set to False to disable Redis caching entirely
 
     # Score recompute interval (seconds)
     score_refresh_seconds: int = 300

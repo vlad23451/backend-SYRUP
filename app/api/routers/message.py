@@ -22,6 +22,7 @@ from services.error_handler_service import handle_api_errors
 
 from schemas.chat import ChatPreview
 from schemas.message import MessageOut
+from schemas.message import ChatHistoryResponse
 
 message_router = APIRouter(prefix="/messages", tags=["Сообщения"])
 
@@ -45,6 +46,7 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[ChatPreview]
             chat_id=chat.get('chat_id'),
             companion_id=chat.get('companion_id'),
             companion_login=chat.get('companion_login'),
+            companion_avatar_url=chat.get('companion_avatar_url'),
             title=chat.get('title'),
             last_message=chat.get('last_message', ''),
             last_message_time=chat.get('last_message_time', datetime.datetime.now()),
@@ -60,11 +62,13 @@ async def get_chats(user: User = Depends(get_current_user)) -> List[ChatPreview]
 async def get_chat_history(chat_id: int,
                            skip: int = Query(0, ge=0),
                            limit: int = Query(50, ge=1, le=200),
-                           user: User = Depends(get_current_user)) -> List[MessageOut]:
-    # Проверяем, что пользователь является участником чата
+                           user: User = Depends(get_current_user)) -> ChatHistoryResponse:
     if not await chat_manager.is_participant(chat_id, user.id):
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Доступ запрещен")
     
     app_logger.info(f"История для чата {chat_id}, user_id={user.id}, skip={skip}, limit={limit}")
-    return await message_manager.get_history_by_chat(chat_id, me_user_id=user.id, skip=skip, limit=limit)
+    return await message_manager.get_chat_history_with_avatar(chat_id,
+                                                              me_user_id=user.id,
+                                                              skip=skip,
+                                                              limit=limit)

@@ -123,9 +123,10 @@ async def update_user_role(
         f"на {UserRole.get_role_name(role_update.new_role)}"
     )
     
-    # Создаем объект UserOut с названием роли
-    user_out = UserOut.model_validate(updated_user)
-    user_out.role_name = UserRole.get_role_name(updated_user.role)
+    # Получаем обновленного пользователя с отношениями
+    updated_user_with_relations = await user_manager.get_user_by_id_with_relations(updated_user.id)
+    from services.avatar_service import avatar_service
+    user_out = await UserOut.from_user_with_relations(updated_user_with_relations, avatar_service)
     
     return user_out
 
@@ -150,13 +151,13 @@ async def get_users_by_role(
             detail="Указана недопустимая роль"
         )
     
-    users = await user_manager.get_users_by_role(role_id)
+    users = await user_manager.get_users_by_role_with_relations(role_id)
     
-    # Добавляем названия ролей
+    # Создаем UserOut с отношениями
+    from services.avatar_service import avatar_service
     result = []
     for user in users:
-        user_out = UserOut.model_validate(user)
-        user_out.role_name = UserRole.get_role_name(user.role)
+        user_out = await UserOut.from_user_with_relations(user, avatar_service)
         result.append(user_out)
     
     return result

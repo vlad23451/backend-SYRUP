@@ -27,14 +27,41 @@ from core.logger import app_logger
 from core.config import settings
 
 from redis.asyncio import Redis
+from redis.exceptions import ConnectionError, RedisError
 
 _redis_client: Redis | None = None
+_redis_available: bool | None = None
 
 def get_redis_client() -> Redis:
     global _redis_client
     if _redis_client is None:
         _redis_client = Redis.from_url(settings.redis_url, decode_responses=False)
     return _redis_client
+
+async def is_redis_available() -> bool:
+    """Check if Redis is available and cache the result."""
+    global _redis_available
+    
+    # Check if Redis is disabled in config
+    if not settings.redis_enabled:
+        if _redis_available is None:
+            app_logger.info("Redis caching is disabled in configuration")
+        _redis_available = False
+        return False
+    
+    if _redis_available is None:
+        try:
+            client = get_redis_client()
+            await client.ping()
+            _redis_available = True
+            app_logger.info("Redis connection established successfully")
+        except (ConnectionError, RedisError) as e:
+            _redis_available = False
+            app_logger.warning(f"Redis not available: {e}. Running without cache.")
+        except Exception as e:
+            _redis_available = False
+            app_logger.warning(f"Unexpected error connecting to Redis: {e}. Running without cache.")
+    return _redis_available
 
 class RedisCache:
     """Базовая обёртка над Redis для сериализации/десериализации пиклем.
@@ -44,12 +71,21 @@ class RedisCache:
     """
     @staticmethod
     async def get(key: str) -> Any | None:
-        client = get_redis_client()
-        raw = await client.get(key)
-        if raw is None:
+        if not await is_redis_available():
             return None
+        
         try:
+            client = get_redis_client()
+            raw = await client.get(key)
+            if raw is None:
+                return None
             return pickle.loads(raw)
+        except (ConnectionError, RedisError):
+            # Redis connection lost, mark as unavailable
+            global _redis_available
+            _redis_available = False
+            app_logger.warning(f"Redis connection lost during get operation for key: {key}")
+            return None
         except Exception:
             app_logger.exception(f"Redis deserialization error for key: {key}")
             return None
@@ -57,10 +93,18 @@ class RedisCache:
     @staticmethod
     async def set(key: str, value: Any, ttl: int = 300) -> None:
         """Установить значение с TTL (в секундах)."""
-        client = get_redis_client()
+        if not await is_redis_available():
+            return
+        
         try:
+            client = get_redis_client()
             data = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
             await client.set(name=key, value=data, ex=ttl)
+        except (ConnectionError, RedisError):
+            # Redis connection lost, mark as unavailable
+            global _redis_available
+            _redis_available = False
+            app_logger.warning(f"Redis connection lost during set operation for key: {key}")
         except Exception:
             app_logger.exception(f"Redis serialization error for key: {key}")
 
@@ -70,16 +114,27 @@ class RedisCache:
 
         Использует scan_iter, чтобы не блокировать Redis большим KEYS.
         """
-        client = get_redis_client()
-        pattern = f"{prefix}*"
-        keys_to_delete = []
-        async for key in client.scan_iter(match=pattern, count=500):
-            keys_to_delete.append(key)
-            if len(keys_to_delete) >= 1000:
+        if not await is_redis_available():
+            return
+            
+        try:
+            client = get_redis_client()
+            pattern = f"{prefix}*"
+            keys_to_delete = []
+            async for key in client.scan_iter(match=pattern, count=500):
+                keys_to_delete.append(key)
+                if len(keys_to_delete) >= 1000:
+                    await client.delete(*keys_to_delete)
+                    keys_to_delete.clear()
+            if keys_to_delete:
                 await client.delete(*keys_to_delete)
-                keys_to_delete.clear()
-        if keys_to_delete:
-            await client.delete(*keys_to_delete)
+        except (ConnectionError, RedisError):
+            # Redis connection lost, mark as unavailable
+            global _redis_available
+            _redis_available = False
+            app_logger.warning(f"Redis connection lost during delete operation for prefix: {prefix}")
+        except Exception:
+            app_logger.exception(f"Redis delete error for prefix: {prefix}")
 
 class UserCacheService:
     """Специализированный кэш для пользовательских данных.

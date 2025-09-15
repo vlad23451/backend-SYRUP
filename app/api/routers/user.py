@@ -75,7 +75,10 @@ async def patch_me(updated_user: UpdateMe,
     result = await user_manager.update_obj(id=user.id, updated_obj=update_data)
     await CacheInvalidationService.on_user_changed(user.id)
     app_logger.info_event("user_profile_updated", user_id=user.id)
-    return UserOut.model_validate(result)
+    
+    updated_user_with_relations = await user_manager.get_user_by_id_with_relations(user.id)
+    from services.avatar_service import avatar_service
+    return await UserOut.from_user_with_relations(updated_user_with_relations, avatar_service)
 
 @user_router.get('/me',
                  summary='Получить данные о себе',

@@ -26,8 +26,6 @@ connection_manager = get_connection_manager()
 @websocket_router.websocket("/",
                             name="WebSocket соединение")
 async def websocket_connect(websocket: WebSocket):
-    app_logger.info(f"WebSocket подключение: {websocket.client}")
-    
     try:
         connected = await connection_manager.connect(websocket)
         if not connected:
@@ -68,22 +66,19 @@ async def _create_private_chat_logic(user_id: int, companion_id: int) -> dict:
     await connection_manager.join_room(str(chat_id), user_id)
     return {"chat_id": chat_id}
 
-
 @websocket_router.post('/get_chat_id',
                        summary='Получить chat_id для чата',
                        status_code=status.HTTP_201_CREATED,
                        description=create_private_chat_description)
 async def create_private_chat(companion_id: int = Body(..., embed=True),
                               user: User = Depends(get_current_user)) -> dict:
-    """Эндпоинт для создания приватного чата"""
     return await _create_private_chat_logic(user.id, companion_id)
 
-async def _send_message_logic(message_data: dict, user_id: int) -> MessageOut:
-    """Логика отправки сообщения через POST запрос"""
+async def _send_message_logic(message_data: dict, user_id: int, sender_login: str) -> MessageOut:
+    message_data["sender_login"] = sender_login
     message = await send_message_to_chat(message_data)
     app_logger.info(f"user_id={user_id} отправляет сообщение в chat_id={message.get('chat_id')}: {message}")
     return message
-
 
 @websocket_router.post('/send_message',
                      summary='Отправить сообщение',
@@ -92,4 +87,4 @@ async def _send_message_logic(message_data: dict, user_id: int) -> MessageOut:
 async def send_message(message_data: dict = Body(...),
                        user: User = Depends(get_current_user)) -> MessageOut:
     """Эндпоинт для отправки сообщения через POST запрос"""
-    return await _send_message_logic(message_data, user.id)
+    return await _send_message_logic(message_data, user.id, user.login)

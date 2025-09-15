@@ -14,6 +14,8 @@ from database.models.message import Message
 
 from schemas.message import MessageOut
 from schemas.message import MessageUpdate
+from schemas.message import ChatHistoryResponse
+from services.avatar_service import avatar_service
 
 from sqlalchemy import and_
 from sqlalchemy import update
@@ -30,7 +32,7 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
         """Выборка сообщений по ID чата."""
         return (
             select(Message)
-            .where(Message.chat_id == chat_id)
+            .where(and_(Message.chat_id == chat_id, Message.is_deleted == False))
             .order_by(Message.timestamp.desc())
             .options(joinedload(Message.sender))
         )
@@ -38,10 +40,10 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
     @staticmethod
     def _select_last_message_by_chat(chat_id: int):
         """Выборка последнего сообщения по ID чата."""
-        return select(Message).where(Message.chat_id == chat_id).order_by(Message.timestamp.desc())
+        return select(Message).where(and_(Message.chat_id == chat_id, Message.is_deleted == False)).order_by(Message.timestamp.desc())
     
     @staticmethod
-    async def _format_message_out(message: Message) -> MessageOut:
+    def _format_message_out(message: Message) -> MessageOut:
         """Форматирование сообщения в схему ответа."""
         return MessageOut(id=message.id,
                           sender_id=message.sender_id,
@@ -51,10 +53,13 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
                           from_me=True,
                           message_type=getattr(message, 'message_type', 'text'),
                           is_read=getattr(message, 'is_read', False),
-                          metadata=getattr(message, 'message_metadata', {}))
+                          metadata=getattr(message, 'message_metadata', {}),
+                          edited_at=getattr(message, 'edited_at', None),
+                          is_deleted=getattr(message, 'is_deleted', False),
+                          is_pinned=getattr(message, 'is_pinned', False))
 
     @staticmethod
-    async def _format_message_out_with_me(message: Message, me_user_id: int) -> MessageOut:
+    def _format_message_out_with_me(message: Message, me_user_id: int) -> MessageOut:
         """Форматирование сообщения с учётом текущего пользователя (from_me)."""
         return MessageOut(id=message.id,
                           sender_id=message.sender_id,
@@ -64,7 +69,10 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
                           from_me=(message.sender_id == me_user_id),
                           message_type=getattr(message, 'message_type', 'text'),
                           is_read=getattr(message, 'is_read', False),
-                          metadata=getattr(message, 'message_metadata', {}))
+                          metadata=getattr(message, 'message_metadata', {}),
+                          edited_at=getattr(message, 'edited_at', None),
+                          is_deleted=getattr(message, 'is_deleted', False),
+                          is_pinned=getattr(message, 'is_pinned', False))
 
     @staticmethod
     async def save_message(message_data: dict) -> MessageOut:
@@ -74,7 +82,10 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
             session.add(message)
             await session.commit()
             await session.refresh(message)
-            return await MessageManager._format_message_out(message)
+            
+            # Загружаем связанный объект sender с avatar_key
+            await session.refresh(message, ['sender'])
+            return MessageManager._format_message_out(message)
 
     @staticmethod
     async def get_chat_history(chat_id: int) -> List[MessageOut]:
@@ -82,7 +93,7 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
         async with manager.get_async_session() as session:
             result = await session.execute(MessageManager._select_messages_by_chat(chat_id))
             messages = result.scalars().all()
-            return [await MessageManager._format_message_out(msg) for msg in messages]
+            return [MessageManager._format_message_out(msg) for msg in messages]
 
     @staticmethod
     async def get_history_by_chat(chat_id: int, me_user_id: int, skip: int = 0, limit: int = 50) -> List[MessageOut]:
@@ -90,13 +101,43 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
         async with manager.get_async_session() as session:
             result = await session.execute(
                 select(Message)
-                .where(Message.chat_id == chat_id)
+                .where(and_(Message.chat_id == chat_id, Message.is_deleted == False))
                 .order_by(Message.timestamp.desc())
                 .offset(skip)
                 .limit(limit)
+                .options(joinedload(Message.sender))
             )
             messages = result.scalars().all()
-            return [await MessageManager._format_message_out_with_me(msg, me_user_id) for msg in messages][::-1]
+            return [MessageManager._format_message_out_with_me(msg, me_user_id) for msg in messages][::-1]
+
+    @staticmethod
+    async def get_chat_history_with_avatar(chat_id: int, me_user_id: int, skip: int = 0, limit: int = 50) -> ChatHistoryResponse:
+        """История сообщений чата с аватаром собеседника."""
+        async with manager.get_async_session() as session:
+            # Получаем сообщения (исключаем удаленные)
+            result = await session.execute(
+                select(Message)
+                .where(and_(Message.chat_id == chat_id, Message.is_deleted == False))
+                .order_by(Message.timestamp.desc())
+                .offset(skip)
+                .limit(limit)
+                .options(joinedload(Message.sender))
+            )
+            messages = result.scalars().all()
+            
+            formatted_messages = [MessageManager._format_message_out_with_me(msg, me_user_id) for msg in messages][::-1]
+            
+            # Получаем аватар собеседника (первого найденного отправителя, который не текущий пользователь)
+            companion_avatar_url = None
+            for msg in messages:
+                if msg.sender_id != me_user_id and msg.sender:
+                    companion_avatar_url = await avatar_service.get_avatar_url_or_none(msg.sender)
+                    break
+            
+            return ChatHistoryResponse(
+                companion_avatar_url=companion_avatar_url,
+                messages=formatted_messages
+            )
 
     @staticmethod
     async def get_last_message_by_chat_id(chat_id: int) -> Message | None:
@@ -145,7 +186,7 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
             msg_obj.edited_at = datetime.now(timezone.utc)
             await session.commit()
             await session.refresh(msg_obj)
-            return await MessageManager._format_message_out(msg_obj)
+            return MessageManager._format_message_out(msg_obj)
 
     @staticmethod
     async def delete_message(message_id: int, requester_user_id: int) -> bool:
@@ -173,4 +214,4 @@ class MessageManager(BaseManager[Message, MessageUpdate]):
             msg_obj.is_pinned = bool(is_pinned)
             await session.commit()
             await session.refresh(msg_obj)
-            return await MessageManager._format_message_out(msg_obj)
+            return MessageManager._format_message_out(msg_obj)

@@ -9,6 +9,8 @@ from database.models.chat import RoomParticipant
 from database.models.message import Message
 from database.models.user import User
 
+from services.s3_service import S3Service
+
 from sqlalchemy import and_
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -16,6 +18,7 @@ from sqlalchemy.orm import joinedload
 class ChatManager(BaseManager[Chat, dict]):
     def __init__(self):
         super().__init__(Chat)
+        self.s3_service = S3Service()
 
     @staticmethod
     async def create_chat(participants: List[int], chat_type: str = 'private', title: str = None) -> Chat:
@@ -249,8 +252,7 @@ class ChatManager(BaseManager[Chat, dict]):
                 chat.updated_at = datetime.now(timezone.utc)
                 await session.commit()
 
-    @staticmethod
-    async def get_user_chats_with_last_messages(user_id: int) -> List[dict]:
+    async def get_user_chats_with_last_messages(self, user_id: int) -> List[dict]:
         """Получить чаты пользователя с последними сообщениями."""
         async with manager.get_async_session() as session:
             # Получаем чаты пользователя
@@ -258,10 +260,10 @@ class ChatManager(BaseManager[Chat, dict]):
             
             result = []
             for chat in user_chats:
-                # Получаем последнее сообщение в чате
+                # Получаем последнее сообщение в чате (исключаем удаленные)
                 last_message_result = await session.execute(
                     select(Message)
-                    .where(Message.chat_id == chat.id)
+                    .where(and_(Message.chat_id == chat.id, Message.is_deleted == False))
                     .order_by(Message.timestamp.desc())
                     .limit(1)
                     .options(joinedload(Message.sender))
@@ -272,6 +274,7 @@ class ChatManager(BaseManager[Chat, dict]):
                     # Для приватного чата находим собеседника
                     companion_id = None
                     companion_login = None
+                    companion_avatar_url = None
                     
                     if chat.chat_type == 'private':
                         # Получаем участников (уже десериализованы SQLAlchemy)
@@ -291,6 +294,9 @@ class ChatManager(BaseManager[Chat, dict]):
                                 companion = companion_result.scalars().first()
                                 if companion:
                                     companion_login = companion.login
+                                    # Генерируем URL аватара если avatar_key существует
+                                    if companion.avatar_key:
+                                        companion_avatar_url = await self.s3_service.generate_presigned_url(companion.avatar_key)
                         except (StopIteration, TypeError, ValueError):
                             pass
                     
@@ -298,6 +304,7 @@ class ChatManager(BaseManager[Chat, dict]):
                         "chat_id": chat.id,
                         "companion_id": companion_id,
                         "companion_login": companion_login,
+                        "companion_avatar_url": companion_avatar_url,
                         "title": chat.title,
                         "last_message": (last_message.text or "")[:100],
                         "last_message_time": last_message.timestamp,

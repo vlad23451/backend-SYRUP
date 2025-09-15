@@ -56,13 +56,14 @@ get_chats_responses_raw = {
             "application/json": {
                 "example": [
                     {
+                        "chat_id": 123,
                         "companion_id": 42,
                         "companion_login": "user2",
-                        "companion_avatar_url": "avatars/example-companion.jpg",
+                        "companion_avatar_url": "https://s3.example.com/avatars/example-companion.jpg?token=...",
+                        "title": None,
                         "last_message": "Привет!",
                         "last_message_time": "2024-05-01T12:00:00",
                         "from_me": True,
-                        "room_id": "room_123",
                         "is_read": False
                     }
                 ]

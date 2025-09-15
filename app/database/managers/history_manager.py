@@ -33,6 +33,7 @@ from services.cache_service import HistoryCacheService
 from services.user_builders_service import build_user_list
 from services.user_builders_service import build_users_map
 from services.score_service import ScoreService
+from services.s3_service import S3Service
 
 from sqlalchemy import desc
 from sqlalchemy import func
@@ -44,6 +45,7 @@ T = TypeVar('T')
 class HistoryManager(BaseManager[History, HistoryUpdate]):
     def __init__(self) -> None:
         super().__init__(History)
+        self.s3_service = S3Service()
 
     # History and Author Query Builders - StaticMethods
 
@@ -231,17 +233,31 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
         liked_users_map, disliked_users_map = await self._fetch_users_maps(history_ids, me_user_id)
         attached_files_map = await self._fetch_attached_files_map(history_ids)
 
-        return [
-            schema_class.from_model_with_counts(
-                history_obj=h,
-                likes=likes_map.get(h.id, 0),
-                dislikes=dislikes_map.get(h.id, 0),
-                comments=comments_map.get(h.id, 0),
-                liked_users=liked_users_map.get(h.id, []),
-                disliked_users=disliked_users_map.get(h.id, []),
-                attached_files=attached_files_map.get(h.id, []),
-            ) for h in histories
-        ]
+        result = []
+        for h in histories:
+            if schema_class.__name__ == 'HistoryOut':
+                # Для HistoryOut нужен avatar_service
+                history_out = await schema_class.from_model_with_counts(
+                    history_obj=h,
+                    likes=likes_map.get(h.id, 0),
+                    dislikes=dislikes_map.get(h.id, 0),
+                    comments=comments_map.get(h.id, 0),
+                    liked_users=liked_users_map.get(h.id, []),
+                    disliked_users=disliked_users_map.get(h.id, []),
+                    attached_files=attached_files_map.get(h.id, []),
+                )
+            else:
+                history_out = schema_class.from_model_with_counts(
+                    history_obj=h,
+                    likes=likes_map.get(h.id, 0),
+                    dislikes=dislikes_map.get(h.id, 0),
+                    comments=comments_map.get(h.id, 0),
+                    liked_users=liked_users_map.get(h.id, []),
+                    disliked_users=disliked_users_map.get(h.id, []),
+                    attached_files=attached_files_map.get(h.id, []),
+                )
+            result.append(history_out)
+        return result
 
     # Utility / Agregation Fetch Helpers
 
@@ -309,8 +325,19 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 )
                 media_files = result.scalars().all()
                 
-                # Преобразуем MediaFile в FileOut
-                return [FileOut.model_validate(media_file) for media_file in media_files]
+                # Преобразуем MediaFile в FileOut с download_url
+                file_outputs = []
+                for media_file in media_files:
+                    file_out = FileOut.model_validate(media_file)
+                    # Генерируем download_url
+                    try:
+                        file_out.download_url = await self.s3_service.generate_presigned_url(media_file.file_key)
+                    except Exception as url_error:
+                        app_logger.error(f"Ошибка генерации URL для файла {media_file.id}: {url_error}")
+                        file_out.download_url = None
+                    file_outputs.append(file_out)
+                
+                return file_outputs
         except Exception as e:
             app_logger.error(f"Ошибка получения файлов для истории {history_id}: {e}")
             return []
@@ -325,12 +352,21 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 )
                 media_files = result.scalars().all()
                 
-                # Группируем файлы по history_id
+                # Группируем файлы по history_id с генерацией download_url
                 files_map: Dict[int, List[FileOut]] = {}
                 for media_file in media_files:
                     if media_file.history_id not in files_map:
                         files_map[media_file.history_id] = []
-                    files_map[media_file.history_id].append(FileOut.model_validate(media_file))
+                    
+                    file_out = FileOut.model_validate(media_file)
+                    # Генерируем download_url
+                    try:
+                        file_out.download_url = await self.s3_service.generate_presigned_url(media_file.file_key)
+                    except Exception as url_error:
+                        app_logger.error(f"Ошибка генерации URL для файла {media_file.id}: {url_error}")
+                        file_out.download_url = None
+                    
+                    files_map[media_file.history_id].append(file_out)
                 
                 return files_map
         except Exception as e:
@@ -352,6 +388,42 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
         except Exception as e:
             app_logger.exception(f"Ошибка при получении историй {e}")
             raise DatabaseError(f"Ошибка при получении историй")
+
+    async def get_histories_by_ids(self,
+                                   ids: List[int],
+                                   me_user_id: int | None = None) -> List[HistoryOut]:
+        try:
+            if not ids:
+                return []
+
+            unique_ids: List[int] = []
+            seen: set[int] = set()
+            for i in ids:
+                if isinstance(i, int) and i not in seen:
+                    seen.add(i)
+                    unique_ids.append(i)
+
+            if not unique_ids:
+                return []
+
+            async with self.manager.get_async_session() as session:
+                result = await session.execute(
+                    select(History)
+                    .options(joinedload(History.author))
+                    .where(History.id.in_(unique_ids))
+                )
+                histories = list(result.scalars().all())
+
+            if not histories:
+                return []
+
+            order_map = {hid: idx for idx, hid in enumerate(unique_ids)}
+            histories.sort(key=lambda h: order_map.get(h.id, len(order_map)))
+
+            return await self._build_histories_with_counts(histories, HistoryOut, me_user_id)
+        except Exception as e:
+            app_logger.exception(f"Ошибка при получении историй по ids: {e}")
+            raise DatabaseError("Ошибка при получении историй по списку ID")
 
     async def get_histories_by_author_id(self,
                                          author_id: int,
@@ -466,7 +538,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             comments_map = await self._fetch_comments_map([id])
             attached_files = await self._fetch_attached_files(id)
             
-            result = HistoryOut.from_model_with_counts(
+            result = await HistoryOut.from_model_with_counts(
                 history_obj=history,
                 likes=likes,
                 dislikes=dislikes,
@@ -495,7 +567,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 comments_map = await self._fetch_comments_map([history_obj.id])
                 
                 # Используем from_model_with_counts вместо model_validate для консистентности
-                out = HistoryOut.from_model_with_counts(
+                out = await HistoryOut.from_model_with_counts(
                     history_obj=history_with_author,
                     likes=likes_map.get(history_obj.id, 0),
                     dislikes=dislikes_map.get(history_obj.id, 0),
@@ -506,7 +578,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 
                 await HistoryCacheService.invalidate_history_cache(history_obj.id)
                 await HistoriesByAuthorCacheService.invalidate_histories(out.author.id if hasattr(out, 'author') and out.author else history_obj.author_id)
-                # Initial score compute for the newly created history
+
                 await ScoreService.recompute_for_history_id(history_obj.id)
                 return out
         except Exception as e:
