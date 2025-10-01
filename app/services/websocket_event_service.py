@@ -11,10 +11,7 @@ from database.managers.user_manager import UserManager
 from services.chat_service import get_chat_id_for_users
 from services.message_service import send_message_to_chat, edit_message, delete_message, set_pinned
 
-
 class WebSocketEventHandler:
-    """Класс для обработки различных типов WebSocket событий"""
-    
     def __init__(self):
         self.connection_manager = get_connection_manager()
         self.message_manager = MessageManager()
@@ -112,6 +109,7 @@ class WebSocketEventHandler:
                 "chat_id": chat_id,
                 "text": str(data["text"]),
                 "sender_login": sender_login,
+                "attached_files": data.get("attached_files", [])
             }
             
             sent = await send_message_to_chat(msg)

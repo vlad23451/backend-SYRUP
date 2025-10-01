@@ -46,6 +46,95 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
     def __init__(self) -> None:
         super().__init__(History)
         self.s3_service = S3Service()
+    
+    
+    async def add_history_files(self, id: int, attached_file_ids: List[int]) -> None:
+        """Добавить файлы к истории"""
+        async with self.manager.get_async_session() as session:
+            try:
+                # Проверяем, что история существует
+                history = await session.get(History, int(id))
+                if not history:
+                    app_logger.error(f"History с id {id} не найден")
+                    raise HistoryNotFoundError(f"History с id {id} не найден")
+                
+                # Получаем текущие файлы истории
+                current_files_result = await session.execute(
+                    select(MediaFile).where(MediaFile.history_id == id)
+                )
+                current_files = current_files_result.scalars().all()
+                current_file_ids = {f.id for f in current_files}
+                
+                # Новые файлы для прикрепления (только те, которых еще нет)
+                new_file_ids = set(attached_file_ids)
+                files_to_attach = new_file_ids - current_file_ids
+                
+                # Прикрепляем только новые файлы
+                if files_to_attach:
+                    from sqlalchemy import update
+                    await session.execute(
+                        update(MediaFile)
+                        .where(MediaFile.id.in_(files_to_attach))
+                        .values(history_id=id)
+                    )
+                
+                await session.commit()
+                app_logger.info(f"Added files to history {id}: {files_to_attach}")
+            except Exception as e:
+                await session.rollback()
+                app_logger.exception(f"History files с id {id} не добавлены: {e}")
+                raise DatabaseError()
+    
+    async def replace_history_files(self, id: int, attached_file_ids: List[int]) -> None:
+        """Полностью заменить вложения истории"""
+        async with self.manager.get_async_session() as session:
+            try:
+                # Проверяем, что история существует
+                history = await session.get(History, int(id))
+                if not history:
+                    app_logger.error(f"History с id {id} не найден")
+                    raise HistoryNotFoundError(f"History с id {id} не найден")
+                
+                # Получаем текущие файлы истории
+                current_files_result = await session.execute(
+                    select(MediaFile).where(MediaFile.history_id == id)
+                )
+                current_files = current_files_result.scalars().all()
+                current_file_ids = {f.id for f in current_files}
+                
+                # Новые файлы для прикрепления
+                new_file_ids = set(attached_file_ids)
+                
+                # Файлы для открепления (были прикреплены, но не в новом списке)
+                files_to_detach = current_file_ids - new_file_ids
+                
+                # Файлы для прикрепления (в новом списке, но не были прикреплены)
+                files_to_attach = new_file_ids - current_file_ids
+                
+                # Открепляем файлы
+                if files_to_detach:
+                    from sqlalchemy import update
+                    await session.execute(
+                        update(MediaFile)
+                        .where(MediaFile.id.in_(files_to_detach))
+                        .values(history_id=None)
+                    )
+                
+                # Прикрепляем файлы
+                if files_to_attach:
+                    from sqlalchemy import update
+                    await session.execute(
+                        update(MediaFile)
+                        .where(MediaFile.id.in_(files_to_attach))
+                        .values(history_id=id)
+                    )
+                
+                await session.commit()
+                app_logger.info(f"Replaced history {id} files: detached {files_to_detach}, attached {files_to_attach}")
+            except Exception as e:
+                await session.rollback()
+                app_logger.exception(f"History files с id {id} не заменены: {e}")
+                raise DatabaseError()
 
     # History and Author Query Builders - StaticMethods
 
@@ -230,6 +319,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
         history_ids = [h.id for h in histories]
         likes_map, dislikes_map = await self._get_like_dislike_maps(history_ids)
         comments_map = await self._fetch_comments_map(history_ids)
+        views_map = await self._fetch_views_map(history_ids)
         liked_users_map, disliked_users_map = await self._fetch_users_maps(history_ids, me_user_id)
         attached_files_map = await self._fetch_attached_files_map(history_ids)
 
@@ -242,6 +332,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                     likes=likes_map.get(h.id, 0),
                     dislikes=dislikes_map.get(h.id, 0),
                     comments=comments_map.get(h.id, 0),
+                    views=views_map.get(h.id, 0),
                     liked_users=liked_users_map.get(h.id, []),
                     disliked_users=disliked_users_map.get(h.id, []),
                     attached_files=attached_files_map.get(h.id, []),
@@ -252,6 +343,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                     likes=likes_map.get(h.id, 0),
                     dislikes=dislikes_map.get(h.id, 0),
                     comments=comments_map.get(h.id, 0),
+                    views=views_map.get(h.id, 0),
                     liked_users=liked_users_map.get(h.id, []),
                     disliked_users=disliked_users_map.get(h.id, []),
                     attached_files=attached_files_map.get(h.id, []),
@@ -315,6 +407,16 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             result = await session.execute(HistoryManager._select_comments_count_for_histories(history_ids))
             return {hid: int(cnt) for hid, cnt in result.all()}
 
+    async def _fetch_views_map(self, history_ids: List[int]) -> Dict[int, int]:
+        """Получает количество просмотров для списка историй."""
+        async with self.manager.get_async_session() as session:
+            # Получаем views_count из таблицы histories
+            result = await session.execute(
+                select(History.id, History.views)
+                .where(History.id.in_(history_ids))
+            )
+            return {hid: int(views) for hid, views in result.all()}
+
     async def _fetch_attached_files(self, history_id: int) -> List[FileOut]:
         """Получает файлы, прикрепленные к истории."""
         try:
@@ -359,7 +461,6 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                         files_map[media_file.history_id] = []
                     
                     file_out = FileOut.model_validate(media_file)
-                    # Генерируем download_url
                     try:
                         file_out.download_url = await self.s3_service.generate_presigned_url(media_file.file_key)
                     except Exception as url_error:
@@ -536,6 +637,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
             likes, dislikes = await self._get_single_like_dislike_counts(id)
             liked_users, disliked_users = await self._fetch_users_for_history(id, me_user_id)
             comments_map = await self._fetch_comments_map([id])
+            views_map = await self._fetch_views_map([id])
             attached_files = await self._fetch_attached_files(id)
             
             result = await HistoryOut.from_model_with_counts(
@@ -543,6 +645,7 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 likes=likes,
                 dislikes=dislikes,
                 comments=comments_map.get(id, 0),
+                views=views_map.get(id, 0),
                 liked_users=liked_users,
                 disliked_users=disliked_users,
                 attached_files=attached_files,
@@ -561,19 +664,19 @@ class HistoryManager(BaseManager[History, HistoryUpdate]):
                 result = await session.execute(HistoryManager._select_with_author_by_id(history_obj.id))
                 history_with_author = result.scalars().first()
                 
-                # Для новой истории counts всегда равны 0, но получаем реальные значения для консистентности
                 likes_map = await self._fetch_count_map(HistoryLike, [history_obj.id])
                 dislikes_map = await self._fetch_count_map(HistoryDislike, [history_obj.id])
                 comments_map = await self._fetch_comments_map([history_obj.id])
+                views_map = await self._fetch_views_map([history_obj.id])
                 
-                # Используем from_model_with_counts вместо model_validate для консистентности
                 out = await HistoryOut.from_model_with_counts(
                     history_obj=history_with_author,
                     likes=likes_map.get(history_obj.id, 0),
                     dislikes=dislikes_map.get(history_obj.id, 0),
                     comments=comments_map.get(history_obj.id, 0),
-                    liked_users=[],  # Новая история не может иметь лайков
-                    disliked_users=[]  # Новая история не может иметь дизлайков
+                    views=views_map.get(history_obj.id, 0),
+                    liked_users=[], 
+                    disliked_users=[]  
                 )
                 
                 await HistoryCacheService.invalidate_history_cache(history_obj.id)

@@ -24,6 +24,7 @@ class MediaFile(Base):
     
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     history_id = Column(Integer, ForeignKey("histories.id"), nullable=True)
+    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
     
     is_public = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
@@ -33,3 +34,4 @@ class MediaFile(Base):
     
     user = relationship("User", back_populates="media_files")
     history = relationship("History", back_populates="media_files")
+    comment = relationship("Comment", back_populates="media_files")

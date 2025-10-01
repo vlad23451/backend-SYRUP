@@ -16,7 +16,7 @@ from core.logger import app_logger
 
 from database.models.user import User
 
-from exceptions.like import DislikeNotFoundError
+from exceptions.likes import DislikeNotFoundError
 
 from schemas.like import HistoryDislikeCreate
 from schemas.like import HistoryDislikeOut

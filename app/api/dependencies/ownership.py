@@ -19,13 +19,13 @@ from database.models.history_like import HistoryLike
 
 from database.models.user import User
 
-from exceptions.comment import OwnershipCommentError
+from exceptions.comments import OwnershipCommentError
 from exceptions.histories import OwnershipHistoryError
 
-from exceptions.like import OwnershipCommentDislikeError
-from exceptions.like import OwnershipCommentLikeError
-from exceptions.like import OwnershipDislikeError
-from exceptions.like import OwnershipLikeError
+from exceptions.likes import OwnershipCommentDislikeError
+from exceptions.likes import OwnershipCommentLikeError
+from exceptions.likes import OwnershipDislikeError
+from exceptions.likes import OwnershipLikeError
 
 from exceptions.users import UserNotFoundError
 

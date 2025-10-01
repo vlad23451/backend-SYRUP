@@ -9,15 +9,12 @@ def datetime_serializer(obj: Any) -> str:
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 def safe_json_dumps(data: Any) -> str:
-    """Безопасная сериализация в JSON с поддержкой datetime."""
     return json.dumps(data, default=datetime_serializer)
 
 def safe_json_loads(json_str: str) -> Any:
-    """Безопасная десериализация из JSON."""
     return json.loads(json_str)
 
 def prepare_for_websocket(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Подготовка данных для отправки через WebSocket."""
     try:
         json.dumps(data)
         return data

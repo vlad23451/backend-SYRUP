@@ -13,7 +13,7 @@ from api.docs.like import like_get_responses
 
 from core.logger import app_logger
 from database.models.user import User
-from exceptions.like import CommentLikeNotFoundError
+from exceptions.likes import CommentLikeNotFoundError
 
 from schemas.like import CommentLikeCreate
 from schemas.like import CommentLikeOut

@@ -17,12 +17,15 @@ from api.docs.avatar import get_my_avatar_description
 from api.docs.avatar import get_user_avatar_description
 from api.docs.avatar import upload_my_avatar_description
 
+from api.docs.user import change_password_description
+from api.docs.user import change_password_responses
 from api.docs.user import delete_user_description
 from api.docs.user import get_histories_by_id_description
 from api.docs.user import get_histories_description
 from api.docs.user import get_me_description
 from api.docs.user import get_user_by_id_description
 from api.docs.user import patch_me_description
+from api.docs.user import search_users_description
 from api.docs.user import user_delete_responses
 from api.docs.user import user_get_responses
 from api.docs.user import user_histories_responses
@@ -43,6 +46,7 @@ from schemas.avatar import UploadAvatarResponse
 
 from schemas.history import HistoryOutShort
 
+from schemas.user import ChangePassword
 from schemas.user import ProfileOutFull
 from schemas.user import UpdateMe
 from schemas.user import UpdateUser
@@ -71,14 +75,46 @@ user_router = APIRouter(prefix='/user', tags=['Пользователи'])
 @handle_api_errors("Ошибка при обновлении данных о себе")
 async def patch_me(updated_user: UpdateMe,
                    user: User = Depends(get_current_user)) -> UserOut:
-    update_data = UpdateUser(**updated_user.model_dump())
-    result = await user_manager.update_obj(id=user.id, updated_obj=update_data)
+    # Создаем UpdateUser только с полями, которые были переданы
+    update_data = UpdateUser()
+    if updated_user.about is not None:
+        update_data.about = updated_user.about
+    if updated_user.avatar_key is not None:
+        update_data.avatar_key = updated_user.avatar_key
+    
+    # Логируем что обновляем
+    app_logger.info(f"Updating user {user.id}: about={updated_user.about}, avatar_key={updated_user.avatar_key}")
+    
+    await user_manager.update_obj(id=user.id, updated_obj=update_data)
     await CacheInvalidationService.on_user_changed(user.id)
     app_logger.info_event("user_profile_updated", user_id=user.id)
     
     updated_user_with_relations = await user_manager.get_user_by_id_with_relations(user.id)
     from services.avatar_service import avatar_service
+    
+    # Логируем результат
+    app_logger.info(f"Updated user avatar_key: {updated_user_with_relations.avatar_key}")
+    
     return await UserOut.from_user_with_relations(updated_user_with_relations, avatar_service)
+
+@user_router.patch('/me/password',
+                  summary='Изменить пароль',
+                  status_code=status.HTTP_200_OK,
+                  responses=change_password_responses,
+                  description=change_password_description)
+@handle_api_errors("Ошибка при изменении пароля")
+async def change_password(password_data: ChangePassword,
+                         user: User = Depends(get_current_user)) -> dict:
+    """Изменить пароль пользователя с проверкой старого пароля."""
+    await user_manager.change_password(
+        user_id=user.id,
+        old_password=password_data.old_password,
+        new_password=password_data.new_password
+    )
+    await CacheInvalidationService.on_user_changed(user.id)
+    app_logger.info_event("user_password_changed", user_id=user.id)
+    
+    return {"message": "Пароль успешно изменен"}
 
 @user_router.get('/me',
                  summary='Получить данные о себе',
@@ -201,19 +237,37 @@ async def get_user_avatar(user_id: int,
 
 @user_router.get('/search',
                  summary='Поиск пользователей по логину',
-                 status_code=status.HTTP_200_OK)
+                 status_code=status.HTTP_200_OK,
+                 description=search_users_description)
 @handle_api_errors("Ошибка при поиске пользователей")
 async def search_users(q: str,
                        me: User = Depends(get_current_user),
+                       friends: bool = False,
+                       followers: bool = False,
+                       following: bool = False,
                        pagination: tuple[int, int] = Depends(get_large_pagination)) -> list[UserShortOutWithFollowStatus]:
     skip, limit = pagination
-    cached = await UsersSearchCacheService.get_search(query=q, skip=skip, limit=limit, me_user_id=me.id)
+    
+    # Создаем уникальный ключ кэша с учетом фильтров
+    cache_key = f"{q}_{skip}_{limit}_{me.id}_{friends}_{followers}_{following}"
+    cached = await UsersSearchCacheService.get_search(query=cache_key, skip=skip, limit=limit, me_user_id=me.id)
     if cached is not None:
-        app_logger.info_event("users_search_cached", query=q, skip=skip, limit=limit, user_id=me.id)
+        app_logger.info_event("users_search_cached", query=q, skip=skip, limit=limit, user_id=me.id, filters=f"{friends}_{followers}_{following}")
         return cached
-    users = await user_manager.search_users(query=q, skip=skip, limit=limit)
+    
+    # Получаем пользователей с учетом фильтров
+    users = await user_manager.search_users_with_filters(
+        query=q, 
+        skip=skip, 
+        limit=limit,
+        me_user_id=me.id,
+        friends_only=friends,
+        followers_only=followers,
+        following_only=following
+    )
+    
     info_map = await build_user_info_many(me_user_id=me.id, users=users)
     result = [info_map[u.id] for u in users]
-    await UsersSearchCacheService.set_search(query=q, skip=skip, limit=limit, me_user_id=me.id, data=result)
-    app_logger.info_event("users_searched", query=q, count=len(result), skip=skip, limit=limit, user_id=me.id)
+    await UsersSearchCacheService.set_search(query=cache_key, skip=skip, limit=limit, me_user_id=me.id, data=result)
+    app_logger.info_event("users_searched", query=q, count=len(result), skip=skip, limit=limit, user_id=me.id, filters=f"{friends}_{followers}_{following}")
     return result

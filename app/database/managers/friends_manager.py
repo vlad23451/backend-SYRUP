@@ -11,6 +11,7 @@ from core.logger import app_logger
 
 from database.managers.followers_manager import FollowersManager
 from database.managers.session_manager import Manager
+from database.managers.user_block_manager import UserBlockManager
 from database.models.friends import Friend
 
 from exceptions.base import DatabaseError
@@ -24,6 +25,7 @@ class FriendsManager:
         self.manager = Manager()
         self._model = Friend
         self.followers_manager = FollowersManager()
+        self.user_block_manager = UserBlockManager()
 
     @staticmethod
     def _select_friendship(user_id: int, friend_id: int):
@@ -41,6 +43,18 @@ class FriendsManager:
 
     async def add_friend(self, user_id: int, friend_id: int) -> Friend | None:
         """Добавить дружбу между двумя пользователями."""
+        # Проверяем, не заблокированы ли пользователи друг другом
+        is_user_blocked = await self.user_block_manager.is_user_blocked(blocker_id=user_id, blocked_user_id=friend_id)
+        is_friend_blocked = await self.user_block_manager.is_user_blocked(blocker_id=friend_id, blocked_user_id=user_id)
+        
+        if is_user_blocked or is_friend_blocked:
+            app_logger.warning_event("friend_add_denied_user_blocked", 
+                                     user_id=user_id, 
+                                     friend_id=friend_id,
+                                     user_blocked=is_user_blocked,
+                                     friend_blocked=is_friend_blocked)
+            return None
+            
         is_user_following = await self.followers_manager.check_mutual_follow(target_id=friend_id, follower_id=user_id)
         is_friend_following = await self.followers_manager.check_mutual_follow(target_id=user_id, follower_id=friend_id)
         if not (is_user_following and is_friend_following):
@@ -88,13 +102,30 @@ class FriendsManager:
         """Получить друзей пользователя с кэшем."""
         cached = await FriendsCacheService.get_friends(user_id=user_id, skip=skip, limit=limit)
         if cached is not None:
-            return cached
+            # Фильтруем заблокированных пользователей из кэша
+            filtered_friends = []
+            for friendship in cached:
+                friend_id = friendship.friend_id if friendship.user_id == user_id else friendship.user_id
+                is_blocked = await self.user_block_manager.is_user_blocked(blocker_id=user_id, blocked_user_id=friend_id)
+                if not is_blocked:
+                    filtered_friends.append(friendship)
+            return filtered_friends
+            
         async with self.manager.get_async_session() as session:
             try:
                 result = await session.execute(FriendsManager._select_friends(user_id).offset(skip).limit(limit))
                 rows = result.scalars().all()
-                await FriendsCacheService.set_friends(user_id=user_id, skip=skip, limit=limit, data=rows)
-                return rows
+                
+                # Фильтруем заблокированных пользователей
+                filtered_friends = []
+                for friendship in rows:
+                    friend_id = friendship.friend_id if friendship.user_id == user_id else friendship.user_id
+                    is_blocked = await self.user_block_manager.is_user_blocked(blocker_id=user_id, blocked_user_id=friend_id)
+                    if not is_blocked:
+                        filtered_friends.append(friendship)
+                
+                await FriendsCacheService.set_friends(user_id=user_id, skip=skip, limit=limit, data=filtered_friends)
+                return filtered_friends
             except Exception:
                 app_logger.error_event("get_friends_failed", user_id=user_id, skip=skip, limit=limit)
                 raise DatabaseError(f"Ошибка при получении друзей user_id={user_id}")

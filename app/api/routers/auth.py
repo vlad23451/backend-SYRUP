@@ -1,13 +1,3 @@
-"""Роуты аутентификации.
-
-Архитектурные заметки:
-- Регистрация и логин делегированы в `services.auth_service`, чтобы роутер
-  оставался тонким.
-- Токены передаются через HTTP-only cookies. Для обновления access-токена
-  используется `validate_refresh_token` (зависимость), извлекающая user_id из
-  refresh-токена.
-- Все неожиданные ошибки оборачиваются `handle_api_errors` в единый ответ.
-"""
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Response
@@ -60,7 +50,6 @@ user_manager = UserManager()
                   description=create_user_description)
 @handle_api_errors("Ошибка при создании пользователя")
 async def create_user(new_user: UserCreate) -> JSONResponse:
-    """Создать пользователя. И выдать токены"""
     access_token, refresh_token = await register_user(new_user)
     db_user = await user_manager.get_user_by_login(new_user.login)
     user_info = UserOut.model_validate(db_user)
@@ -81,7 +70,6 @@ async def create_user(new_user: UserCreate) -> JSONResponse:
                   description=login_description)
 @handle_api_errors("Ошибка при входе в аккаунт")
 async def login(user: UserAuth) -> JSONResponse:
-    """Войти в аккаунт. И выдать токены"""
     access_token, refresh_token = await login_user(user)
     db_user = await user_manager.get_user_by_login_with_relations(user.login)
     user_info = await UserOut.from_user_with_relations(db_user, avatar_service)
@@ -103,12 +91,10 @@ async def login(user: UserAuth) -> JSONResponse:
 @handle_api_errors("Ошибка при обновлении access токена")
 async def refresh_access_token(response: Response,
                                user_id: int = Depends(validate_refresh_token)) -> Response:
-    """Обновить access токен"""
     access_token = create_access_token({"sub": str(user_id)})
     refresh_token = create_refresh_token({"sub": str(user_id)})
     response = JSONResponse(content={"message": "Access токен обновлен"})
     set_auth_cookies(response, access_token, refresh_token)
-    app_logger.info(f"Access токен обновлен для пользователя user_id={user_id}")
     return response
 
 @auth_router.post('/logout',
@@ -118,7 +104,6 @@ async def refresh_access_token(response: Response,
                   description=logout_description)
 async def logout(response: Response,
                  user: User = Depends(get_current_user)) -> Response:
-    """Выйти из аккаунта и почистить за собой куки"""
     response.status_code = status.HTTP_200_OK
     response.content = {"message": "Вы успешно вышли из аккаунта"}
     clear_auth_cookies(response)
@@ -132,11 +117,8 @@ async def logout(response: Response,
                  description=get_token_description)
 @handle_api_errors("Ошибка при получении токена")
 async def get_websocket_token(user: User = Depends(get_current_user)) -> TokenResponse:
-    access_token = create_access_token({"sub": str(user.id)})
-
-    app_logger.info(f"WebSocket токен выдан пользователю {user.id}")
     return TokenResponse(
-        access_token=access_token,
+        access_token=create_access_token({"sub": str(user.id)}),
         token_type="bearer",
         expires_in=settings.jwt_access_token_expire_minutes * 60
     )

@@ -20,6 +20,7 @@ class HistoryOut(BaseModel):
     likes: int
     dislikes: int
     comments: int
+    views: int
     liked_users: List[UserShortOutWithFollowStatus] = []
     disliked_users: List[UserShortOutWithFollowStatus] = []
     attached_files: List[FileOut] = []
@@ -36,6 +37,7 @@ class HistoryOut(BaseModel):
         likes: int,
         dislikes: int,
         comments: int = 0,
+        views: int = 0,
         liked_users: List[UserShortOutWithFollowStatus] | None = None,
         disliked_users: List[UserShortOutWithFollowStatus] | None = None,
         attached_files: List[FileOut] | None = None,
@@ -65,6 +67,7 @@ class HistoryOut(BaseModel):
             likes=int(likes or 0),
             dislikes=int(dislikes or 0),
             comments=int(comments or 0),
+            views=int(views or 0),
             liked_users=liked_users or [],
             disliked_users=disliked_users or [],
             attached_files=attached_files or [],
@@ -78,6 +81,7 @@ class HistoryOutShort(BaseModel):
     likes: int
     dislikes: int
     comments: int
+    views: int
     liked_users: List[UserShortOutWithFollowStatus] = []
     disliked_users: List[UserShortOutWithFollowStatus] = []
     attached_files: List[FileOut] = []
@@ -93,23 +97,37 @@ class HistoryOutShort(BaseModel):
         likes: int,
         dislikes: int,
         comments: int = 0,
+        views: int = 0,
         liked_users: List[UserShortOutWithFollowStatus] | None = None,
         disliked_users: List[UserShortOutWithFollowStatus] | None = None,
         attached_files: List[FileOut] | None = None,
     ) -> "HistoryOutShort":
-        base = cls.model_validate(history_obj)
-        return base.model_copy(update={
-            "likes": int(likes or 0),
-            "dislikes": int(dislikes or 0),
-            "comments": int(comments or 0),
-            "liked_users": liked_users or [],
-            "disliked_users": disliked_users or [],
-            "attached_files": attached_files or [],
-        })
+        # Создаем базовую схему без использования model_validate на detached объекте
+        base_data = {
+            "id": history_obj.id,
+            "title": history_obj.title,
+            "description": history_obj.description,
+            "created_at": history_obj.created_at,
+            "updated_at": history_obj.updated_at,
+        }
+        
+        return cls(
+            **base_data,
+            likes=int(likes or 0),
+            dislikes=int(dislikes or 0),
+            comments=int(comments or 0),
+            views=int(views or 0),
+            liked_users=liked_users or [],
+            disliked_users=disliked_users or [],
+            attached_files=attached_files or [],
+        )
 
 class HistoryUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
+
+class HistoryFilesUpdate(BaseModel):
+    attached_file_ids: List[int]
 
 class HistoryIdsIn(BaseModel):
     ids: List[int]

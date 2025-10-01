@@ -92,3 +92,89 @@ get_chats_responses = {
     404: get_chats_responses_raw["404"],
     500: get_chats_responses_raw["500"],
 }
+
+search_messages_description = (
+    "Поиск сообщений по тексту с возможностью фильтрации по чату, типу сообщения и дате. "
+    "Требует авторизации. "
+    "Возвращает найденные сообщения с контекстом и информацией о чатах. "
+    "Поддерживает пагинацию и различные фильтры. "
+    "Возможные ошибки: пустой запрос, доступ к чату запрещен, ошибка базы данных."
+)
+
+search_messages_responses_raw = {
+    "200": {
+        "description": "Результаты поиска сообщений.",
+        "content": {
+            "application/json": {
+                "example": {
+                    "results": [
+                        {
+                            "message": {
+                                "id": 1,
+                                "sender_id": 2,
+                                "chat_id": 3,
+                                "text": "Найденное сообщение с поисковым запросом",
+                                "message_type": "text",
+                                "timestamp": "2024-05-01T12:00:00",
+                                "is_read": True,
+                                "metadata": {},
+                                "from_me": False,
+                                "edited_at": None,
+                                "is_deleted": False,
+                                "is_pinned": False
+                            },
+                            "chat_title": "Групповой чат",
+                            "companion_login": "user2",
+                            "companion_avatar_url": "https://s3.example.com/avatars/user2.jpg",
+                            "context_before": "Предыдущее сообщение...",
+                            "context_after": "Следующее сообщение..."
+                        }
+                    ],
+                    "total_count": 15,
+                    "has_more": True,
+                    "query": "поисковый запрос"
+                }
+            }
+        }
+    },
+    "400": {
+        "description": "Пустой поисковый запрос.",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Поисковый запрос не может быть пустым"}
+            }
+        }
+    },
+    "403": {
+        "description": "Доступ к чату запрещен.",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Доступ к чату запрещен"}
+            }
+        }
+    },
+    "422": {
+        "description": "Ошибка валидации входных данных.",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Ошибка валидации."}
+            }
+        }
+    },
+    "500": {
+        "description": "Внутренняя ошибка сервера (DatabaseError)",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Внутренняя ошибка сервера."}
+            }
+        }
+    },
+}
+
+search_messages_responses = {
+    200: search_messages_responses_raw["200"],
+    400: search_messages_responses_raw["400"],
+    403: search_messages_responses_raw["403"],
+    422: search_messages_responses_raw["422"],
+    500: search_messages_responses_raw["500"],
+}

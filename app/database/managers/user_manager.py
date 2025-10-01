@@ -13,6 +13,7 @@ from database.models.followers import Follower
 
 from exceptions.base import DatabaseError
 from exceptions.users import InvalidCredentialsError
+from exceptions.users import InvalidOldPasswordError
 from exceptions.users import UserAlreadyExistsError
 from exceptions.users import UserNotFoundError
 
@@ -131,6 +132,39 @@ class UserManager(BaseManager[User, UpdateUser]):
                 .limit(limit)
             )
             return result.scalars().all()
+    
+    @staticmethod
+    async def search_users_with_filters(query: str, skip: int = 0, limit: int = 100, 
+                                       me_user_id: int = None, friends_only: bool = False,
+                                       followers_only: bool = False, following_only: bool = False):
+        """Поиск пользователей с фильтрацией по друзьям, подписчикам и подпискам"""
+        async with manager.get_async_session() as session:
+            base_query = select(User).where(User.login.ilike(f"%{query}%"))
+            
+            # Если ищем только среди друзей
+            if friends_only and me_user_id:
+                from database.models.friends import Friend
+                friends_subquery = select(Friend.friend_id).where(Friend.user_id == me_user_id).union(
+                    select(Friend.user_id).where(Friend.friend_id == me_user_id)
+                )
+                base_query = base_query.where(User.id.in_(friends_subquery))
+            
+            # Если ищем только среди подписчиков
+            elif followers_only and me_user_id:
+                from database.models.followers import Follower
+                followers_subquery = select(Follower.follower_id).where(Follower.user_id == me_user_id)
+                base_query = base_query.where(User.id.in_(followers_subquery))
+            
+            # Если ищем только среди подписок
+            elif following_only and me_user_id:
+                from database.models.followers import Follower
+                following_subquery = select(Follower.user_id).where(Follower.follower_id == me_user_id)
+                base_query = base_query.where(User.id.in_(following_subquery))
+            
+            result = await session.execute(
+                base_query.offset(skip).limit(limit)
+            )
+            return result.scalars().all()
 
     @staticmethod
     async def get_users_by_role_with_relations(role_id: int):
@@ -179,6 +213,41 @@ class UserManager(BaseManager[User, UpdateUser]):
     def _hash_password(password: str) -> str:
         return bcrypt.hashpw(password.encode("utf-8"),
                              bcrypt.gensalt()).decode("utf-8")
+    
+    @staticmethod
+    async def change_password(user_id: int, old_password: str, new_password: str) -> User:
+        """Изменить пароль пользователя с проверкой старого пароля."""
+        async with manager.get_async_session() as session:
+            try:
+                result = await session.execute(select(User).where(User.id == user_id))
+                user = result.scalars().first()
+                if not user:
+                    raise UserNotFoundError()
+                
+                # Проверяем старый пароль
+                db_password_hash = getattr(user, "password_hash", None)
+                if not db_password_hash or not bcrypt.checkpw(
+                    old_password.encode("utf-8"), 
+                    db_password_hash.encode("utf-8")
+                ):
+                    app_logger.warning_event("password_change_invalid_old", user_id=user_id)
+                    raise InvalidOldPasswordError()
+                
+                # Хешируем новый пароль
+                new_password_hash = UserManager._hash_password(new_password)
+                user.password_hash = new_password_hash
+                
+                await session.commit()
+                await session.refresh(user)
+                
+                app_logger.info_event("password_changed", user_id=user_id)
+                return user
+            except (UserNotFoundError, InvalidOldPasswordError):
+                raise
+            except Exception as e:
+                await session.rollback()
+                app_logger.exception(f"Ошибка при смене пароля пользователя {user_id}: {e}")
+                raise DatabaseError("Ошибка при смене пароля")
     
     @staticmethod
     async def get_users_by_role(role_id: int) -> list[User]:

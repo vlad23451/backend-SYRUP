@@ -149,11 +149,56 @@ user_delete_responses = {
     500: user_delete_responses_raw["500"],
 }
 
+change_password_responses = {
+    status.HTTP_200_OK: {
+        "description": "Пароль успешно изменён.",
+        "content": {
+            "application/json": {
+                "example": {
+                    "message": "Пароль успешно изменен"
+                }
+            }
+        }
+    },
+    status.HTTP_400_BAD_REQUEST: {
+        "description": "Неверный старый пароль или ошибка валидации (InvalidCredentialsError, ValidationError)",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Неверный старый пароль"}
+            }
+        }
+    },
+    status.HTTP_404_NOT_FOUND: {
+        "description": "Пользователь не найден (UserNotFoundError)",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Пользователь не найден."}
+            }
+        }
+    },
+    status.HTTP_500_INTERNAL_SERVER_ERROR: {
+        "description": "Внутренняя ошибка сервера (DatabaseError)",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Внутренняя ошибка сервера."}
+            }
+        }
+    },
+}
+
 patch_me_description = (
     "Изменяет данные текущего пользователя (например, имя, email, аватар и т.д.). "
     "Требует авторизации. "
     "Возвращает обновлённые данные пользователя. "
     "Возможные ошибки: пользователь не найден, ошибка базы данных."
+)
+
+change_password_description = (
+    "Изменяет пароль текущего пользователя. "
+    "Требует подтверждения старого пароля. "
+    "Новый пароль должен содержать минимум 6 символов. "
+    "Требует авторизации. "
+    "Возможные ошибки: неверный старый пароль, пользователь не найден, ошибка базы данных."
 )
 
 get_me_description = (
@@ -186,4 +231,14 @@ get_histories_by_id_description = (
     "Возвращает все истории пользователя по его идентификатору. "
     "Доступно без авторизации. "
     "Возможные ошибки: пользователь не найден, ошибка базы данных."
-) 
+)
+
+search_users_description = (
+    "Поиск пользователей по логину с возможностью фильтрации. "
+    "Параметры фильтрации: "
+    "- friends: искать только среди друзей "
+    "- followers: искать только среди подписчиков "
+    "- following: искать только среди подписок "
+    "Требует авторизации. "
+    "Возможные ошибки: ошибка базы данных."
+)

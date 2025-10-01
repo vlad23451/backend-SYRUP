@@ -2,8 +2,10 @@ from database.managers.connection_singleton import get_connection_manager
 from database.managers.message_manager import MessageManager
 from database.managers.chat_manager import ChatManager
 from database.managers.user_manager import UserManager
+from database.managers.private_media_file_manager import PrivateMediaFileManager
 
 from services.validation_service import ValidationService as VS
+from services.private_media_service import PrivateMediaService
 
 from utils.json_utils import prepare_for_websocket
 
@@ -12,6 +14,8 @@ from core.logger import app_logger
 message_manager = MessageManager()
 connection_manager = get_connection_manager()
 user_manager = UserManager()
+private_media_file_manager = PrivateMediaFileManager()
+private_media_service = PrivateMediaService(private_media_file_manager)
 
 async def send_message_to_chat(message_data: dict,
                                from_me: bool = True) -> dict:
@@ -43,6 +47,11 @@ async def send_message_to_chat(message_data: dict,
 
     # Сохраняем в БД
     saved = await message_manager.save_message(db_message_data)
+    
+    # Обрабатываем прикрепленные файлы
+    attached_files = message_data.get("attached_files", [])
+    if attached_files:
+        await _attach_files_to_message(saved.id, attached_files)
 
     # Обновляем время последней активности чата
     await ChatManager.update_chat_activity(chat_id)
@@ -54,8 +63,9 @@ async def send_message_to_chat(message_data: dict,
     websocket_message = prepare_for_websocket(message_dict)
     websocket_message["type"] = "new_message"  # Добавляем тип события
     
-    # Добавляем логин отправителя (всегда есть)
+    # Добавляем логин отправителя и прикрепленные файлы (всегда есть)
     websocket_message["sender_login"] = sender_login
+    websocket_message["attached_files"] = attached_files
     
     # Отправляем всем участникам чата, подключенным к WebSocket
     await connection_manager.send_private_message(str(chat_id), websocket_message)
@@ -65,8 +75,8 @@ async def send_message_to_chat(message_data: dict,
     app_logger.info(f"Сообщение разослано участникам чата {chat_id}: {message_dict.get('text', '')[:50]}...")
     app_logger.info(f"Участники чата {chat_id} подключенные к WebSocket после отправки: {chat_participants_ws}")
 
-    # Добавляем sender_login в ответ API
-    result = {**message_dict, "from_me": from_me, "sender_login": sender_login}
+    # Добавляем sender_login и прикрепленные файлы в ответ API
+    result = {**message_dict, "from_me": from_me, "sender_login": sender_login, "attached_files": attached_files}
     
     return result
 
@@ -92,3 +102,16 @@ async def set_pinned(message_id: int, requester_user_id: int, is_pinned: bool, c
     payload["type"] = "message_pinned"
     await connection_manager.send_private_message(str(saved.chat_id), payload)
     return payload
+
+
+async def _attach_files_to_message(message_id: int, file_ids: list[int]) -> None:
+    """Прикрепляет файлы к сообщению"""
+    try:
+        for file_id in file_ids:
+            success = await private_media_service.attach_to_message(file_id, message_id)
+            if success:
+                app_logger.info(f"Файл {file_id} успешно прикреплен к сообщению {message_id}")
+            else:
+                app_logger.warning(f"Не удалось прикрепить файл {file_id} к сообщению {message_id}")
+    except Exception as e:
+        app_logger.error(f"Ошибка прикрепления файлов к сообщению {message_id}: {e}")

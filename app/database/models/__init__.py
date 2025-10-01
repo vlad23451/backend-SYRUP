@@ -9,3 +9,6 @@ from .history_score import HistoryScore
 from .media_file import MediaFile
 from .message import Message
 from .chat import Chat, RoomParticipant
+from .favorites import Favorite
+from .history_view import HistoryView
+from .user_block import UserBlock

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from .comments import Comment
     from .history_score import HistoryScore
     from .media_file import MediaFile
+    from .favorites import Favorite
+    from .history_view import HistoryView
 
 class History(Base):
     __tablename__ = 'histories'
@@ -26,6 +28,7 @@ class History(Base):
     likes: Mapped[int] = mapped_column(default=0, nullable=False)
     dislikes: Mapped[int] = mapped_column(default=0, nullable=False)
     comments: Mapped[int] = mapped_column(default=0, nullable=False)
+    views: Mapped[int] = mapped_column(default=0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,
@@ -67,4 +70,12 @@ class History(Base):
     
     media_files: Mapped[list["MediaFile"]] = relationship(
         'MediaFile', back_populates='history', cascade='all, delete-orphan'
+    )
+    
+    favorites: Mapped[list["Favorite"]] = relationship(
+        'Favorite', back_populates='history', cascade='all, delete-orphan'
+    )
+    
+    history_views: Mapped[list["HistoryView"]] = relationship(
+        'HistoryView', back_populates='history', cascade='all, delete-orphan'
     )

@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     from .history_like import HistoryLike, HistoryDislike
     from .comment_like import CommentLike, CommentDislike
     from .media_file import MediaFile
+    from .favorites import Favorite
+    from .history_view import HistoryView
+    from .user_block import UserBlock
 
 class User(Base):
     __tablename__ = 'users'
@@ -69,5 +72,28 @@ class User(Base):
     
     media_files: Mapped[list["MediaFile"]] = relationship(
         'MediaFile', back_populates='user', cascade='all, delete-orphan'
+    )
+    
+    
+    favorites: Mapped[list["Favorite"]] = relationship(
+        'Favorite', back_populates='user', cascade='all, delete-orphan'
+    )
+    
+    history_views: Mapped[list["HistoryView"]] = relationship(
+        'HistoryView', back_populates='user', cascade='all, delete-orphan'
+    )
+    
+    blocked_users: Mapped[list["UserBlock"]] = relationship(
+        'UserBlock', 
+        foreign_keys='UserBlock.blocker_id',
+        back_populates='blocker',
+        cascade='all, delete-orphan'
+    )
+    
+    blocked_by_users: Mapped[list["UserBlock"]] = relationship(
+        'UserBlock', 
+        foreign_keys='UserBlock.blocked_id',
+        back_populates='blocked',
+        cascade='all, delete-orphan'
     )
     

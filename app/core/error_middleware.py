@@ -15,17 +15,17 @@ from exceptions.base import PermissionError
 from exceptions.base import UnknownDatabaseError
 from exceptions.base import ValidationError
 
-from exceptions.comment import CommentNotFoundError
-from exceptions.comment import OwnershipCommentError
+from exceptions.comments import CommentNotFoundError
+from exceptions.comments import OwnershipCommentError
 
 from exceptions.histories import HistoryNotFoundError
 from exceptions.histories import OwnershipHistoryError
 
-from exceptions.like import LikeNotFoundError
-from exceptions.like import OwnershipLikeError
+from exceptions.likes import LikeNotFoundError
+from exceptions.likes import OwnershipLikeError
 
-from exceptions.message import MessageNotFoundError
-from exceptions.message import OwnershipMessageError
+from exceptions.messages import MessageNotFoundError
+from exceptions.messages import OwnershipMessageError
 
 from exceptions.users import InvalidCredentialsError
 from exceptions.users import InvalidUserDataError

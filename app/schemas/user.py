@@ -12,13 +12,17 @@ class FollowStatus(Enum):
     FOLLOWING_ME = "following_me"
     MUTUAL = "mutual"
     ME = "me"
+    BLOCKED_BY_ME = "blocked_by_me"
+    BLOCKED_ME = "blocked_me"
 
 class UserBase(BaseModel):
     login: str
     about: str | None = None
     avatar_url: str | None = None
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    login: str
+    about: str | None = None
     password: str
 
 class UserOut(UserBase):
@@ -77,7 +81,7 @@ class UserOut(UserBase):
         }
         return UserOut(**data)
 
-    model_config = ConfigDict(from_attributes=True, exclude={'avatar_key'})
+    model_config = ConfigDict(from_attributes=True)
 
 class UserShortOut(BaseModel):
     id: int
@@ -106,7 +110,7 @@ class UserShortOut(BaseModel):
         }
         return UserShortOut(**data)
 
-    model_config = ConfigDict(from_attributes=True, exclude={'avatar_key'})
+    model_config = ConfigDict(from_attributes=True)
 
 class UserShortOutWithFollowStatus(UserShortOut):
     follow_status: FollowStatus
@@ -124,6 +128,18 @@ class UpdateUser(BaseModel):
 class UpdateMe(BaseModel):
     about: str | None = None
     avatar_key: str | None = None
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+    
+    @field_validator("new_password")
+    def validate_new_password(cls, v):
+        if len(v) < 6:
+            raise ValueError("Пароль должен содержать минимум 6 символов")
+        if len(v) > 100:
+            raise ValueError("Пароль не должен превышать 100 символов")
+        return v
 
 class ProfileOutFull(BaseModel):
     user_info: UserShortOutWithFollowStatus

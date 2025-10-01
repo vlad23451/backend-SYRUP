@@ -9,6 +9,11 @@ from .history import history_router as history
 from .like import like_router as like
 from .message import message_router as message
 from .media import media_router as media
+from .private_media import private_media_router as private_media
 from .role import role_router as role
 from .user import user_router as user
 from .websocket import websocket_router as websocket
+from .favorites import favorites_router as favorites
+from .history_views import history_views_router as history_views
+from .user_blocks import user_blocks_router as user_blocks
+from .pinned_message import pinned_message_router as pinned_message

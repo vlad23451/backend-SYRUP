@@ -29,8 +29,8 @@ from core.logger import app_logger
 from database.managers.media_file_manager import MediaFileManager
 from database.models.user import User
 
-from exceptions.media import MediaFileNotFoundError
-from exceptions.media import MediaFileAccessDeniedError
+from exceptions.media_files import MediaFileNotFoundError
+from exceptions.media_files import MediaFileAccessDeniedError
 
 from schemas.media import MediaFileResponse
 from schemas.media import MediaFileUploadResponse
@@ -56,7 +56,6 @@ async def upload_file(file: UploadFile = File(...),
                       description: str | None = Form(None),
                       is_public: bool = Form(False),
                       current_user: User = Depends(get_current_user)) -> MediaFileUploadResponse:
-    """Загружает файл в S3 и создает запись в базе данных."""
     result = await media_service.upload_file(
         file=file,
         user_id=current_user.id,
@@ -157,45 +156,59 @@ async def get_history_files(history_id: int) -> List[MediaFileResponse]:
     files = await media_service.get_history_files(history_id)
     return [MediaFileResponse(**file) for file in files]
 
+@media_router.get("/comment/{comment_id}/files",
+                  summary="Получить файлы комментария",
+                  responses=media_file_list_responses,
+                  description="Получить все файлы, прикрепленные к комментарию")
+@handle_api_errors("Ошибка получения файлов комментария")
+async def get_comment_files(comment_id: int) -> List[MediaFileResponse]:
+    """Получает все файлы, прикрепленные к комментарию."""
+    files = await media_service.get_comment_files(comment_id)
+    return [MediaFileResponse(**file) for file in files]
+
 @media_router.post("/attach",
-                   summary="Прикрепить файл к истории",
+                   summary="Прикрепить файл к истории или комментарию",
                    responses=media_attach_responses,
                    description=attach_file_description)
 @handle_api_errors("Ошибка прикрепления файла")
-async def attach_file_to_history(attach_request: MediaFileAttachRequest,
-                                 current_user: User = Depends(get_current_user)) -> dict:
-    """Прикрепляет файл к истории."""
-    success = await media_service.attach_to_history(
+async def attach_file(attach_request: MediaFileAttachRequest,
+                     current_user: User = Depends(get_current_user)) -> dict:
+    """Прикрепляет файл к истории или комментарию."""
+    success = await media_service.attach_file(
         file_id=attach_request.file_id,
         history_id=attach_request.history_id,
+        comment_id=attach_request.comment_id,
         user_id=current_user.id
     )
     
     if not success:
         raise MediaFileAccessDeniedError("Файл не найден или у вас нет прав на его прикрепление")
     
-    app_logger.info(f"Пользователь {current_user.id} прикрепил файл {attach_request.file_id} к истории {attach_request.history_id}")
-    return {"message": "Файл успешно прикреплен к истории"}
+    target = f"истории {attach_request.history_id}" if attach_request.history_id else f"комментарию {attach_request.comment_id}"
+    app_logger.info(f"Пользователь {current_user.id} прикрепил файл {attach_request.file_id} к {target}")
+    return {"message": f"Файл успешно прикреплен к {target}"}
 
 @media_router.post("/detach", 
-                   summary="Открепить файл от истории",
+                   summary="Открепить файл от истории или комментария",
                    responses=media_attach_responses,
                    description=detach_file_description)
 @handle_api_errors("Ошибка открепления файла")
-async def detach_file_from_history(detach_request: MediaFileDetachRequest,
-                                  current_user: User = Depends(get_current_user)) -> dict:
-    """Открепляет файл от истории."""
-    success = await media_service.detach_from_history(
+async def detach_file(detach_request: MediaFileDetachRequest,
+                     current_user: User = Depends(get_current_user)) -> dict:
+    """Открепляет файл от истории или комментария."""
+    success = await media_service.detach_file(
         file_id=detach_request.file_id,
         history_id=detach_request.history_id,
+        comment_id=detach_request.comment_id,
         user_id=current_user.id
     )
     
     if not success:
         raise MediaFileAccessDeniedError("Файл не найден или у вас нет прав на его открепление")
     
-    app_logger.info(f"Пользователь {current_user.id} открепил файл {detach_request.file_id} от истории {detach_request.history_id}")
-    return {"message": "Файл успешно откреплен от истории"}
+    target = f"истории {detach_request.history_id}" if detach_request.history_id else f"комментарию {detach_request.comment_id}"
+    app_logger.info(f"Пользователь {current_user.id} открепил файл {detach_request.file_id} от {target}")
+    return {"message": f"Файл успешно откреплен от {target}"}
 
 @media_router.get("/public", 
                   summary="Получить публичные файлы",

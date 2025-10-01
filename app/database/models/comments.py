@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .user import User
     from .history import History
     from .comment_like import CommentLike, CommentDislike
+    from .media_file import MediaFile
 
 class CommentType(EnumType):
     TEXT = 'text'
@@ -58,6 +59,10 @@ class Comment(Base):
         cascade='all, delete'
     )
     comment_dislikes: Mapped[list["CommentDislike"]] = relationship(
+        back_populates='comment',
+        cascade='all, delete'
+    )
+    media_files: Mapped[list["MediaFile"]] = relationship(
         back_populates='comment',
         cascade='all, delete'
     )

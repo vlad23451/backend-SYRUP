@@ -36,9 +36,7 @@ class Settings(BaseSettings):
     # Score recompute interval (seconds)
     score_refresh_seconds: int = 300
     
-    # S3 Storage settings
-    s3_access_key_id: str = "f55abbf2689e48a7a5c0682250228bf5"
-    s3_secret_access_key: str = "c9a013b509114a2ebcc429ee9cefce71"
+    # S3 Storage settings (основной бакет)
     s3_bucket_name: str = "test-backet-syrup"
     s3_region: str = "ru-7"
     s3_endpoint_url: str  = "https://s3.ru-7.storage.selcloud.ru" 
@@ -47,6 +45,16 @@ class Settings(BaseSettings):
     s3_verify_ssl: bool = False
     s3_ca_bundle_path: str | None = None
     
+    # S3 Private Media Storage settings (приватный бакет для медиафайлов)
+    private_s3_access_key_id: str = "f55abbf2689e48a7a5c0682250228bf5" 
+    private_s3_secret_access_key: str = "c9a013b509114a2ebcc429ee9cefce71"  
+    private_s3_bucket_name: str = "private-syrup" 
+    private_s3_region: str = "ru-7"
+    private_s3_endpoint_url: str = "https://s3.ru-7.storage.selcloud.ru"  # Или ваш endpoint
+    private_s3_use_ssl: bool = True
+    private_s3_verify_ssl: bool = False
+    private_s3_ca_bundle_path: str | None = None
+    
     # File upload settings
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     allowed_file_types: list[str] = [
@@ -54,6 +62,14 @@ class Settings(BaseSettings):
         "video/mp4", "video/webm", "video/ogg",
         "audio/mpeg", "audio/wav", "audio/ogg",
         "application/pdf", "text/plain"
+    ]
+    
+    # Private media file settings
+    private_media_max_file_size: int = 50 * 1024 * 1024  # 50MB для приватных медиафайлов
+    private_media_allowed_types: list[str] = [
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "video/mp4", "video/webm", "video/ogg", "video/quicktime",
+        "audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4", "audio/aac"
     ]
     
     model_config = {

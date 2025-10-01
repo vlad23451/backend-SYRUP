@@ -1,9 +1,3 @@
-"""Зависимости аутентификации.
-
-Содержит вспомогательные функции для получения текущего пользователя по JWT
-из cookie и проверки refresh-токена. Все ошибки переводятся в доменные
-исключения для единообразной обработки middleware/декоратором.
-"""
 from fastapi import Request
 from jose import JWTError
 
@@ -17,7 +11,6 @@ from database.managers.user_manager import UserManager
 from database.models.user import User
 
 from exceptions.base import PermissionError
-from exceptions.base import ValidationError
 
 from exceptions.users import UserNotFoundError
 
@@ -33,11 +26,11 @@ async def get_current_user(request: Request) -> User:
         sub = payload.get("sub")
         if sub is None:
             app_logger.error(f"Неверный токен sub: {sub} token: {token}")
-            raise ValidationError("Неверный токен")
+            raise PermissionError("Неверный токен")
         user_id = int(sub)
     except (JWTError, ValueError):
         app_logger.error(f"Неверный токен: {token}")
-        raise ValidationError("Неверный токен")
+        raise PermissionError("Неверный токен")
     try:
         user = await user_manager.get_obj_by_id(id=user_id)
     except UserNotFoundError as e:
@@ -53,10 +46,10 @@ async def validate_refresh_token(request: Request) -> int:
         payload = decode_token(refresh_token)
         sub = payload.get("sub")
         if sub is None:
-            raise ValidationError(f"Неверный токен sub: {sub} refresh_token: {refresh_token}")
+            raise PermissionError(f"Неверный токен sub: {sub} refresh_token: {refresh_token}")
         user_id = int(sub)
     except (JWTError, ValueError):
-        raise ValidationError(f"Неверный токен refresh_token: {refresh_token}")
+        raise PermissionError(f"Неверный токен refresh_token: {refresh_token}")
 
     try:
         await user_manager.get_obj_by_id(user_id)

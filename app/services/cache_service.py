@@ -27,7 +27,8 @@ from core.logger import app_logger
 from core.config import settings
 
 from redis.asyncio import Redis
-from redis.exceptions import ConnectionError, RedisError
+from redis.exceptions import ConnectionError
+from redis.exceptions import RedisError
 
 _redis_client: Redis | None = None
 _redis_available: bool | None = None
@@ -42,7 +43,6 @@ async def is_redis_available() -> bool:
     """Check if Redis is available and cache the result."""
     global _redis_available
     
-    # Check if Redis is disabled in config
     if not settings.redis_enabled:
         if _redis_available is None:
             app_logger.info("Redis caching is disabled in configuration")
@@ -81,7 +81,6 @@ class RedisCache:
                 return None
             return pickle.loads(raw)
         except (ConnectionError, RedisError):
-            # Redis connection lost, mark as unavailable
             global _redis_available
             _redis_available = False
             app_logger.warning(f"Redis connection lost during get operation for key: {key}")
